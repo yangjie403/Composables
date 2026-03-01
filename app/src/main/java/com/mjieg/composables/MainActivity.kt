@@ -8,7 +8,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
-import com.mjieg.composables.components.FullScreenSearchBarScaffoldSample
+import com.mjieg.composables.components.BasicAlertDialogSample
 import com.mjieg.composables.ui.PreviewLayout
 import com.mjieg.composables.ui.theme.ComposablesTheme
 
@@ -19,7 +19,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             ComposablesTheme {
                 PreviewLayout {
-                    FullScreenSearchBarScaffoldSample()
+                    BasicAlertDialogSample()
                 }
             }
         }
