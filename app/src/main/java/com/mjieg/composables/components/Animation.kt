@@ -1,9 +1,11 @@
 package com.mjieg.composables.components
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
@@ -38,6 +41,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
@@ -47,9 +52,13 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 
+
+private const val TAG = "Animation"
 @Composable
 fun AnimatedButton(
     text: String,
@@ -236,6 +245,7 @@ fun AnimateContentSizeExample() {
             .padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // animateContentSize修饰符必须放在任何大小修饰符之前
         ExpandableText(
             text = "Jetpack Compose 提供了 animateContentSize 修饰符来实现高度与宽度的平滑尺寸变化动画。这是一个多行长文本的展开/收起示例。我们没有使用传统的覆盖渐变背景那种取巧且容易遮挡文字的方法，而是使用了 TextMeasurer 先行测量并精确计算第二行的末尾索引位置，确保“...展开”这几个字无缝地衔接在文本的最尾部。点击高亮文字后，它将平滑过渡，这极大地提升了用户界面的交互体验！",
             maxLines = 3
@@ -335,5 +345,80 @@ fun ExpandableText(
                 modifier = Modifier.animateContentSize()
             )
         }
+    }
+}
+
+/**
+ * layout和size顺序的区别
+ * 情况一：size在layout之后（当前代码写法）
+ * 执行逻辑（从内向外报告尺寸）：
+ * 约束传递（向下）：父组件给出可用空间限制，传递给layout，layout原封不动传递给size。
+ * 内层测量（向上）：size(100.dp)接收到约束后，将内部的 Box强制测量为100x100，并作为一个 Placeable返回给你的layout。
+ * 外层测量（向上）：在你的layout闭包中，placeable.width就是精确的100dp的像素值。然后你执行了layout()。
+ * 最终结果：这个组件向它的父布局报告的最终尺寸是 100 + offset。
+ * 如果旁边有其他组件，它会把周围的组件推开。
+ *
+ * 情况二：size在layout之前
+ * 执行逻辑（从内向外报告尺寸）：
+ * 约束传递（向下）：size(100.dp)接收到父组件的约束后，生成一个固定约束（Exactly 100dp），传递给内层的layout。
+ * 内层测量（向上）：layout让最内部的Box进行测量（因为有固定约束，Box变成100x100）。layout尝试计算自己的尺寸为100+offset，并将其返回给size。
+ * 外层测量（向上）：size(100.dp) 作为一个强势的“外壳”，它无视了内部layout报告的变大尺寸，强行截断，向父容器报告：“我的尺寸就是严格的100x100”。
+ * 最终结果：这个组件向它的父布局报告的最终尺寸永远是固定的100dp x 100dp。
+ * 它不会推开周围的任何组件，而是会覆盖在周围组件的上方（或者被覆盖，取决于层级）
+ *
+ * 框架的自动居中补偿
+ * 在Compose中，当一个组件报告的尺寸（200px）大于它最终被强制限制的尺寸（100px）时，
+ * Compose默认的放置策略是：将超出约束范围的内容“居中放置”在受约束的边界内。
+ */
+@Composable
+fun AnimateOffsetAsStateExample() {
+    var moved by remember {
+        mutableStateOf(false)
+    }
+    val pxToMove = with(LocalDensity.current) {
+        100.dp.toPx().roundToInt()
+    }
+    val offset by animateIntOffsetAsState(
+        targetValue = if (moved) {
+            IntOffset(pxToMove, pxToMove)
+        } else {
+            IntOffset.Zero
+        },
+        label = "offset"
+    )
+    val interactionSource = remember {
+        MutableInteractionSource()
+    }
+
+    Column(
+        modifier = Modifier
+            .padding(16.dp)
+            .fillMaxWidth()
+            .clickable(interactionSource = interactionSource, indication = null) {
+                moved = !moved
+            }
+    ) {
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(MaterialTheme.colorScheme.primary)
+        )
+        Box(
+            modifier = Modifier
+                .layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    Log.d(TAG, "AnimateOffsetAsStateExample: ${placeable.width.toDp()} x ${placeable.height.toDp()}")
+                    layout(placeable.width + offset.x, placeable.height + offset.y) {
+                        placeable.placeRelative(offset)
+                    }
+                }
+                .size(100.dp)
+                .background(MaterialTheme.colorScheme.secondary)
+        )
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(MaterialTheme.colorScheme.tertiary)
+        )
     }
 }
