@@ -1,9 +1,16 @@
 package com.mjieg.composables.components
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -42,11 +49,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.mjieg.composables.R
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -192,13 +202,52 @@ fun LoadingIndicatorPullToRefreshSample() {
                 }
             }
             Box(
-                Modifier.align(Alignment.TopCenter).graphicsLayer {
-                    scaleX = scaleFraction()
-                    scaleY = scaleFraction()
-                }
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .graphicsLayer {
+                        scaleX = scaleFraction()
+                        scaleY = scaleFraction()
+                    }
             ) {
                 PullToRefreshDefaults.LoadingIndicator(state = state, isRefreshing = isRefreshing)
             }
         }
+    }
+}
+
+@Composable
+fun ImageRotationLoading(
+    modifier: Modifier = Modifier,
+    durationMillis: Int = 3000 // 旋转一圈所需的时间（毫秒）
+) {
+    // 1. 创建无限循环的动画状态
+    val infiniteTransition = rememberInfiniteTransition(label = "loading")
+
+    // 2. 定义从 0 到 360 度的动画
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            // 使用 LinearEasing 确保旋转过程匀速，不会有顿挫感
+            animation = tween(durationMillis, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    Box {
+        // 3. 显示图片并应用旋转
+        Image(
+            painter = painterResource(id = R.drawable.ic_loading), // 你的图片资源
+            contentDescription = "Loading",
+            modifier = modifier
+                .size(48.dp) // 设置大小
+                .graphicsLayer {
+                    // 使用 graphicsLayer 实现旋转，性能比 Modifier.rotate 更优
+                    // 因为它只在绘制阶段处理，不会触发布局重测
+                    rotationZ = rotation
+                    transformOrigin = TransformOrigin.Center
+                }
+        )
     }
 }
