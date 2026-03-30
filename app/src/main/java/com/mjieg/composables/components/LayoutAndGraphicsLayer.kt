@@ -38,10 +38,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.clipRect
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
@@ -94,44 +92,54 @@ fun JellyButton() {
     }
 }
 
-fun Modifier.ignoreParentPadding(horizontalPadding: Dp): Modifier =
+fun Modifier.ignoreParentPadding(
+    horizontalPadding: Dp = 0.dp,
+    verticalPadding: Dp = 0.dp
+): Modifier =
     layout { measurable, constraints ->
         // 将 dp 转为 px
-        val paddingPx = horizontalPadding.roundToPx()
+        val paddingPxH = horizontalPadding.roundToPx()
+        val paddingPxV = verticalPadding.roundToPx()
 
         // 修改约束：允许子组件比父组件给的宽度更宽（加上两侧 padding）
-        val newWidth = constraints.maxWidth + paddingPx * 2
+        val newWidth = constraints.maxWidth + paddingPxH * 2
+        val newHeight = constraints.maxHeight + paddingPxV * 2
         val newConstraints = constraints.copy(
             minWidth = newWidth,
-            maxWidth = newWidth
+            maxWidth = newWidth,
+            minHeight = newHeight,
+            maxHeight = newHeight
         )
 
         val placeable = measurable.measure(newConstraints)
 
-        layout(constraints.maxWidth, placeable.height) {
-            placeable.placeRelative(-paddingPx, 0)
+        layout(placeable.width, placeable.height) {
+            placeable.placeRelative(0, 0)
         }
     }
 
 @Composable
 fun FullWidthBanner() {
-    Column(
-        modifier = Modifier
-            .padding(16.dp)
-            .background(Color.Gray)
-    ) {
-        Text("Normal Text")
-
-        Box(
+    Box(Modifier.width(200.dp)) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .ignoreParentPadding(16.dp)
-                .height(100.dp)
-                .background(Color.Red)
-        )
+                .padding(16.dp)
+                .background(Color.Gray)
+        ) {
+            Text("Normal Text")
 
-        Text("Normal Text")
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .ignoreParentPadding(16.dp)
+                    .background(Color.Red)
+            )
+
+            Text("Normal Text")
+        }
     }
+
 }
 
 @Composable
@@ -556,7 +564,12 @@ fun PolyToPolyFoldingCard() {
         ) {
             // 卡片内容
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("POLY-TO-POLY", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    "POLY-TO-POLY",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
                 Text("Folding Matrix", color = Color.White.copy(0.7f))
             }
         }
