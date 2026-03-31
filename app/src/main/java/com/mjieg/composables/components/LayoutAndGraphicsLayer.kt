@@ -1,7 +1,9 @@
 package com.mjieg.composables.components
 
+import android.graphics.Bitmap
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,23 +34,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 @Composable
@@ -572,6 +585,76 @@ fun PolyToPolyFoldingCard() {
                 )
                 Text("Folding Matrix", color = Color.White.copy(0.7f))
             }
+        }
+    }
+}
+
+@Composable
+fun ComposeToBitmapExample() {
+    // 1. 创建一个 graphicsLayer 用于捕获内容
+    val graphicsLayer = rememberGraphicsLayer()
+    val coroutineScope = rememberCoroutineScope()
+    var capturedBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    val scale = 3f
+    val sizePx = with(LocalDensity.current) { 100.dp.toPx() }
+    val targetSize = IntSize((sizePx * scale).toInt(), (sizePx * scale).toInt())
+    Column(
+        modifier = Modifier
+            .wrapContentSize(Alignment.Center)
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // 2. 这是你想要转换成图片的内容区域
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .drawWithContent {
+                    // 绘制内容到屏幕上
+                    drawContent()
+                    // 【关键点】将内容记录到 graphicsLayer 中
+                    // 缩放处理
+                    graphicsLayer.record(size = targetSize) {
+                        scale(scale, pivot = Offset.Zero) {
+                            this@drawWithContent.drawContent()
+                        }
+                    }
+                    // 将记录的内容（缩放后的）绘制到屏幕上
+                    // drawLayer(graphicsLayer)
+                }
+                .background(Color.Blue)
+        ) {
+            Text(
+                text = "Hello Bitmap!",
+                color = Color.White,
+                fontSize = 10.sp,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // 3. 触发转换的按钮
+        Button(onClick = {
+            coroutineScope.launch {
+                // 将记录的layer（缩放后的）转换为ImageBitmap，再转为Android Bitmap
+                val bitmap = graphicsLayer.toImageBitmap().asAndroidBitmap()
+                capturedBitmap = bitmap
+            }
+        }) {
+            Text("点击生成 Bitmap")
+        }
+
+        // 4. 显示生成的预览图（仅用于测试）
+        capturedBitmap?.let {
+            Spacer(modifier = Modifier.height(20.dp))
+            Text("预览生成的图片：")
+            Image(
+                bitmap = it.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier
+                    .size(300.dp)
+                    .background(Color.LightGray)
+            )
         }
     }
 }

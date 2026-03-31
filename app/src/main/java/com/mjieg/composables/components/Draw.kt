@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -33,6 +34,7 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -149,7 +151,9 @@ fun DrawContentExample() {
 @Composable
 fun DistinctCompositingExample() {
     Column(
-        modifier = Modifier.fillMaxSize().padding(20.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(40.dp)
     ) {
@@ -264,6 +268,7 @@ fun OverlappingCircles() {
         )
     }
 }
+
 @Composable
 fun HolePunchExample() {
     Box(
@@ -288,6 +293,37 @@ fun HolePunchExample() {
                 radius = 200f,
                 blendMode = BlendMode.Clear // 清除缓冲区内容
             )
+        }
+    }
+}
+
+// 使用CompositingStrategy.Offscreen时，系统会创建绘制区域大小的屏幕外纹理，
+// 并将其渲染回屏幕上。默认情况下，使用此策略完成的所有绘制命令都会被裁剪至此区域。
+@Composable
+fun CompositingStrategyExamples() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .wrapContentSize(Alignment.Center)
+    ) {
+        Canvas(
+            modifier = Modifier
+                .graphicsLayer()
+                .size(100.dp)
+                .border(2.dp, color = Color.Blue)
+        ) {
+            drawRect(color = Color.Magenta, size = Size(200.dp.toPx(), 200.dp.toPx()))
+        }
+        Spacer(modifier = Modifier
+            .size(300.dp)
+            .border(1.dp, color = Color.Red))
+        Canvas(
+            modifier = Modifier
+                .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                .size(100.dp)
+                .border(2.dp, color = Color.Blue)
+        ) {
+            drawRect(color = Color.Red, size = Size(200.dp.toPx(), 200.dp.toPx()))
         }
     }
 }
