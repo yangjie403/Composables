@@ -15,7 +15,6 @@ fun PreviewLayout(
     Surface(
         modifier = Modifier
             .fillMaxSize()
-            .systemBarsPadding()
             .wrapContentSize(Alignment.Center)
     ) {
         content()
