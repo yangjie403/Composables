@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,14 +69,23 @@ fun XiaohongshuLikeExplosionButton() {
                             explosionProgress.animateTo(
                                 targetValue = 1f,
                                 // 爆炸特效通常一开始极快，然后慢下来散开
-                                animationSpec = tween(durationMillis = 400, easing = LinearOutSlowInEasing)
+                                animationSpec = tween(
+                                    durationMillis = 400,
+                                    easing = LinearOutSlowInEasing
+                                )
                             )
                         }
 
                         // 【并发执行】 爱心Q弹动画
                         heartScale.animateTo(0.7f, tween(100))
-                        heartScale.animateTo(1.3f, spring(Spring.DampingRatioHighBouncy, Spring.StiffnessMedium))
-                        heartScale.animateTo(1f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow))
+                        heartScale.animateTo(
+                            1.3f,
+                            spring(Spring.DampingRatioHighBouncy, Spring.StiffnessMedium)
+                        )
+                        heartScale.animateTo(
+                            1f,
+                            spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow)
+                        )
                     }
                 } else {
                     // 取消点赞时不需要爆炸特效，只有爱心回缩
@@ -154,5 +164,155 @@ fun XiaohongshuLikeExplosionButton() {
                     scaleY = heartScale.value
                 }
         )
+    }
+}
+
+@Composable
+fun ZeroRecompositionLikeButton(onClick: (isLiked: Boolean) -> Unit = {}) {
+    // 内部状态仅在 onClick 的 lambda 中读取和修改，不在组合(Composition)作用域内读取
+    // 这意味着 isLiked 的改变不会触发当前组件的重组！
+    var isLiked by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val interactionSource = remember { MutableInteractionSource() }
+    val lastClickTime = remember { mutableLongStateOf(0L) }
+    // 动画状态：全部使用 Animatable，以便我们在 graphicsLayer 中精准提取 value
+    val heartScale = remember { Animatable(1f) }
+    val explosionProgress = remember { Animatable(0f) }
+    val crossfadeAlpha = remember { Animatable(0f) } // 0f = 显示灰色空心, 1f = 显示红色实心
+
+    Box(
+        modifier = Modifier
+            .size(72.dp)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null
+            ) {
+                if (System.currentTimeMillis() - lastClickTime.longValue < 500) {
+                    return@clickable
+                }
+                lastClickTime.longValue = System.currentTimeMillis()
+                isLiked = !isLiked // 状态修改
+                onClick(isLiked)
+                if (isLiked) {
+                    coroutineScope.launch {
+                        // 1. 颜色渐变 (修改透明度，不触发重组)
+                        launch { crossfadeAlpha.animateTo(1f, tween(200)) }
+
+                        // 2. 爆炸特效
+                        launch {
+                            explosionProgress.snapTo(0f)
+                            explosionProgress.animateTo(
+                                1f,
+                                tween(400, easing = LinearOutSlowInEasing)
+                            )
+                        }
+
+                        // 3. Q弹缩放
+                        launch {
+                            heartScale.animateTo(0.7f, tween(100))
+                            heartScale.animateTo(
+                                1.3f,
+                                spring(Spring.DampingRatioHighBouncy, Spring.StiffnessMedium)
+                            )
+                            heartScale.animateTo(
+                                1f,
+                                spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessLow)
+                            )
+                        }
+                    }
+                } else {
+                    coroutineScope.launch {
+                        launch { crossfadeAlpha.animateTo(0f, tween(200)) }
+                        launch {
+                            heartScale.animateTo(0.8f, tween(100))
+                            heartScale.animateTo(1f, spring(Spring.DampingRatioNoBouncy))
+                        }
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        // --- 第一层：爆炸特效 Canvas ---
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            // 【极其关键】在 Canvas (DrawScope) 内部读取 value，仅触发绘制阶段(Draw Phase)
+            val p = explosionProgress.value
+            if (p > 0f && p < 1f) {
+                val center = Offset(size.width / 2, size.height / 2)
+                val maxRadius = size.width / 2
+
+                // 绘制圆环
+                val ringRadius = maxRadius * 0.3f + (maxRadius * 0.4f) * p
+                val ringAlpha = (1f - p * 1.25f).coerceIn(0f, 1f)
+                if (ringAlpha > 0f) {
+                    drawCircle(
+                        color = Color(0xFFFE2C55),
+                        radius = ringRadius,
+                        center = center,
+                        style = Stroke(width = 3.dp.toPx() * ringAlpha),
+                        alpha = ringAlpha
+                    )
+                }
+
+                // 绘制散开的圆点
+                val dotCount = 8
+                val startDotRadius = maxRadius * 0.3f
+                val endDotRadius = maxRadius * 0.9f
+                val currentDotRadius = startDotRadius + (endDotRadius - startDotRadius) * p
+                val dotAlpha = (1f - p).coerceIn(0f, 1f)
+                val dotSize = 3.5.dp.toPx() * (1f - p * 0.5f)
+
+                for (i in 0 until dotCount) {
+                    val angle = i * (2 * PI / dotCount)
+                    val x = center.x + currentDotRadius * cos(angle).toFloat()
+                    val y = center.y + currentDotRadius * sin(angle).toFloat()
+
+                    drawCircle(
+                        color = Color(0xFFFE2C55),
+                        radius = dotSize,
+                        center = Offset(x, y),
+                        alpha = dotAlpha
+                    )
+                }
+            }
+        }
+
+        // --- 第二层：爱心本体容器 ---
+        Box(
+            modifier = Modifier
+                .size(32.dp)
+                .graphicsLayer {
+                    // 【极其关键】在 graphicsLayer 内部读取 scale，不触发重组，直接交由 GPU 缩放
+                    val scale = heartScale.value
+                    scaleX = scale
+                    scaleY = scale
+                }
+        ) {
+            // 底图：灰色空心爱心 (点赞时透明度逐渐变为0)
+            Icon(
+                imageVector = Icons.Filled.FavoriteBorder,
+                contentDescription = null,
+                tint = Color(0xFF9E9E9E),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // 【极其关键】仅在绘制阶段改变透明度
+                        alpha = 1f - crossfadeAlpha.value
+                    }
+            )
+
+            // 顶图：红色实心爱心 (点赞时透明度逐渐变为1)
+            Icon(
+                imageVector = Icons.Filled.Favorite,
+                contentDescription = null,
+                tint = Color(0xFFFE2C55),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        // 【极其关键】仅在绘制阶段改变透明度
+                        alpha = crossfadeAlpha.value
+                    }
+            )
+        }
     }
 }
