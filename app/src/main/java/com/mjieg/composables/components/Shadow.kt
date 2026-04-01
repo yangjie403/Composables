@@ -1,8 +1,13 @@
 package com.mjieg.composables.components
 
 import androidx.compose.animation.animateColor
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.background
@@ -19,8 +24,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -29,6 +37,7 @@ import androidx.compose.ui.draw.innerShadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.drawscope.DrawScope.Companion.DefaultBlendMode
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
@@ -210,5 +219,69 @@ fun AnimatedColoredShadow() {
                 textAlign = TextAlign.Center
             )
         }
+    }
+}
+
+@Composable
+fun InwardGradientBox() {
+    val infiniteTransition = rememberInfiniteTransition(label = "infinite")
+    // 1. 动画状态管理
+    var isRunning by remember { mutableStateOf(true) }
+
+    // 使用 Animatable 来管理 0 到 1 的数值
+    val animatedProgress = remember { Animatable(0f) }
+
+    // 2. 动画循环逻辑
+    LaunchedEffect(isRunning) {
+        if (isRunning) {
+            // 当 isRunning 为 true 时，开始无限循环
+            animatedProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse
+                )
+            )
+        } else {
+            // 当 isRunning 为 false 时，停止动画并瞬间归零
+            animatedProgress.snapTo(0f)
+        }
+    }
+    // 2. 定义动画数值
+    val animatedValue by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            // durationMillis = 1000ms (1秒)
+            animation = tween(1000, easing = LinearEasing),
+            // RepeatMode.Reverse 保证了 0->1 之后会进行 1->0
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "floatValue"
+    )
+    Box(
+        modifier = Modifier
+            .size(width = 300.dp, height = 600.dp)
+            .background(Color.White) // 设置底色以便看清透明度效果
+            .graphicsLayer {
+                alpha = animatedProgress.value
+            }
+            .innerShadow(
+                shape = RectangleShape,
+                shadow = Shadow(
+                    radius = 50.dp,
+                    spread = 0.dp,
+                    color = Color.Blue.copy(alpha = 0.4f),
+                )
+            )
+    ) {
+        // 在这里放置内容
+        Text(
+            text = "Center Content",
+            modifier = Modifier.align(Alignment.Center)
+                .clickable {
+                    isRunning = !isRunning
+                },
+        )
     }
 }
