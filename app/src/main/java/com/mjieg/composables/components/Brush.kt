@@ -1,5 +1,6 @@
 package com.mjieg.composables.components
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.wrapContentSize
@@ -17,18 +19,30 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.LinearGradientShader
+import androidx.compose.ui.graphics.Shader
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.imageResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.mjieg.composables.R
+import androidx.core.graphics.scale
 
 @Composable
 fun LinearGradientExample() {
@@ -227,7 +241,9 @@ fun StripedBackground() {
         tileMode = TileMode.Repeated
     )
 
-    Box(modifier = Modifier.size(100.dp).background(brush))
+    Box(modifier = Modifier
+        .size(100.dp)
+        .background(brush))
 }
 
 @Composable
@@ -244,6 +260,73 @@ fun PulsatingRadialGradient() {
             .size(80.dp)
             .background(brush)
     )
+}
+
+@Composable
+fun NonFixedBrushSize() {
+    val listColors = listOf(Color.Yellow, Color.Red, Color.Blue)
+    val customBrush = remember {
+        object : ShaderBrush() {
+            override fun createShader(size: Size): Shader {
+                return LinearGradientShader(
+                    colors = listColors,
+                    from = Offset.Zero,
+                    to = Offset(size.width / 3, 0f),
+                    tileMode = TileMode.Mirror
+                )
+            }
+        }
+    }
+    Box(
+        modifier = Modifier
+            .requiredSize(100.dp)
+            .background(brush = customBrush)
+    )
+}
+
+@Composable
+fun ImageBrushExample() {
+    val imageBrush =
+        ShaderBrush(ImageShader(ImageBitmap.imageResource(R.drawable.xx)))
+
+    val imageBitmap = ImageBitmap.imageResource(R.drawable.xx)
+
+    val scaledImageBrush = remember {
+        object : ShaderBrush() {
+            override fun createShader(size: Size): Shader {
+                val scale = size.width / imageBitmap.width
+                val scaledBitmap = imageBitmap.asAndroidBitmap().scale(
+                    (imageBitmap.width * scale).toInt(),
+                    (imageBitmap.height * scale).toInt()
+                )
+                return ImageShader(
+                    image = scaledBitmap.asImageBitmap(),
+                    tileModeX = TileMode.Clamp,
+                    tileModeY = TileMode.Clamp,
+                )
+            }
+        }
+    }
+    Column {
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .background(imageBrush)
+        )
+        Text(
+            text = "ImageBrush",
+            style = TextStyle(
+                brush = imageBrush,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 36.sp
+            )
+        )
+        Canvas(
+            modifier = Modifier.size(100.dp)
+        ) {
+            drawCircle(scaledImageBrush)
+        }
+    }
 }
 
 @Preview
@@ -268,5 +351,7 @@ fun GradientExample() {
         TileModeComparison()
         StripedBackground()
         PulsatingRadialGradient()
+        NonFixedBrushSize()
+        ImageBrushExample()
     }
 }
