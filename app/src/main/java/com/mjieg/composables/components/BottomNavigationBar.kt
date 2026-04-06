@@ -44,8 +44,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 
@@ -325,6 +327,140 @@ fun AnimatedBottomNavigationBar() {
                             contentDescription = null,
                             tint = iconColor,
                             modifier = Modifier.size(28.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OptimizedAnimatedBottomNavigationBar() {
+    var selectedIndex by remember { mutableIntStateOf(0) }
+
+    val navItems = listOf(
+        Icons.Outlined.Home,
+        Icons.Outlined.DateRange,
+        Icons.Outlined.Person,
+        Icons.Outlined.ShoppingCart
+    )
+
+    val bottomBarColor = Color(0xFFFFEBEA)
+    val unselectedIconColor = Color(0xFFA1AFBE)
+    val selectedIconColor = Color(0xFF4A5668)
+
+    // 凹槽平移状态 (完全在 drawBehind 中读取，无重组)
+    val animatedOffset by animateFloatAsState(
+        targetValue = selectedIndex.toFloat(),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+        label = "offset"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp)
+            .drawBehind { // 【优化点】在 Draw 阶段读取 animatedOffset，避免组合阶段重组
+                val itemWidth = size.width / navItems.size
+                val centerX = (animatedOffset + 0.5f) * itemWidth
+
+                val radius = 55.dp.toPx()
+                val depth = 35.dp.toPx()
+                val barHeight = 70.dp.toPx()
+                val startY = size.height - barHeight
+
+                val path = Path().apply {
+                    moveTo(0f, startY)
+                    lineTo(centerX - radius, startY)
+                    cubicTo(
+                        centerX - radius / 2f, startY,
+                        centerX - radius / 2f, startY + depth,
+                        centerX, startY + depth
+                    )
+                    cubicTo(
+                        centerX + radius / 2f, startY + depth,
+                        centerX + radius / 2f, startY,
+                        centerX + radius, startY
+                    )
+                    lineTo(size.width, startY)
+                    lineTo(size.width, size.height)
+                    lineTo(0f, size.height)
+                    close()
+                }
+                drawPath(path, color = bottomBarColor)
+            }
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .height(70.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            navItems.forEachIndexed { index, icon ->
+                val isSelected = selectedIndex == index
+
+                // 位移动画状态
+                val yOffset by animateDpAsState(
+                    targetValue = if (isSelected) (-35).dp else 0.dp,
+                    animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessLow),
+                    label = "yOffset"
+                )
+
+                // 综合透明度状态 (替代颜色动画)
+                val transitionProgress by animateFloatAsState(
+                    targetValue = if (isSelected) 1f else 0f,
+                    animationSpec = spring(stiffness = Spring.StiffnessLow),
+                    label = "progress"
+                )
+
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { selectedIndex = index }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            // 【极致优化 1】使用 Lambda 版本的 offset
+                            // 这会将状态的读取推迟到 Layout(布局) 阶段，跳过 Recomposition
+                            .offset { IntOffset(0, yOffset.roundToPx()) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // 背后那个粉色圆圈
+                        Box(
+                            modifier = Modifier
+                                .size(55.dp)
+                                // 【极致优化 2】使用 graphicsLayer 控制透明度
+                                // 这会将状态推迟到 Draw(绘制) 阶段，避免修改 background 颜色引发重组
+                                .graphicsLayer { alpha = transitionProgress }
+                                .background(color = bottomBarColor, shape = CircleShape)
+                        )
+
+                        // 【极致优化 3】使用两层 Icon 交替透明度，替代 animateColorAsState
+                        // Icon 的 tint 一旦改变必引发自身重组。通过改变叠加层的 alpha 可以将改变推迟到绘制阶段
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = unselectedIconColor,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .graphicsLayer { alpha = 1f - transitionProgress } // 未选中时的图标
+                        )
+
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = selectedIconColor,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .graphicsLayer { alpha = transitionProgress } // 选中时的深色图标
                         )
                     }
                 }
