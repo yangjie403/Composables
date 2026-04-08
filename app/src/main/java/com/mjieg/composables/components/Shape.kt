@@ -1,6 +1,5 @@
 package com.mjieg.composables.components
 
-import android.graphics.Matrix
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -20,11 +19,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -127,13 +128,75 @@ fun MorphingAnimation() {
 
     Canvas(modifier = Modifier.size(200.dp)) {
         val matrix = Matrix()
-        matrix.setScale(size.width / 2f, size.height / 2f)
-        matrix.postTranslate(size.width / 2f, size.height / 2f)
+        matrix.scale(size.width / 2f, size.height / 2f)
+        matrix.translate(size.width / 2f, size.height / 2f)
 
         // 4. 获取当前进度的 Path
         val currentPath = morph.toPath(progress).asComposePath()
-        currentPath.asAndroidPath().transform(matrix)
+        currentPath.transform(matrix)
 
         drawPath(currentPath, color = Color.Cyan)
+    }
+}
+
+
+
+class TicketShape(private val cutoutRadius: Float) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val path = Path().apply {
+            reset()
+            lineTo(0f, size.height / 2f - cutoutRadius)
+            // 左侧缺口 (使用圆弧)
+            arcTo(
+                rect = Rect(
+                    left = -cutoutRadius,
+                    top = size.height / 2f - cutoutRadius,
+                    right = cutoutRadius,
+                    bottom = size.height / 2f + cutoutRadius
+                ),
+                startAngleDegrees = 270f,
+                sweepAngleDegrees = 180f,
+                forceMoveTo = false
+            )
+            lineTo(0f, size.height)
+            lineTo(size.width, size.height)
+            lineTo(size.width, size.height / 2f + cutoutRadius)
+            // 右侧缺口
+            arcTo(
+                rect = Rect(
+                    left = size.width - cutoutRadius,
+                    top = size.height / 2f - cutoutRadius,
+                    right = size.width + cutoutRadius,
+                    bottom = size.height / 2f + cutoutRadius
+                ),
+                startAngleDegrees = 90f,
+                sweepAngleDegrees = 180f,
+                forceMoveTo = false
+            )
+            lineTo(size.width, 0f)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+
+@Composable
+fun ClipRoundedPolygonShapeExample() {
+    val clip = remember {
+        TicketShape(30f)
+    }
+    Box(
+        modifier = Modifier
+            .size(100.dp)
+            .clip(clip)
+            .background(Color.Blue),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text = "Hello Compose", color = Color.White)
     }
 }
