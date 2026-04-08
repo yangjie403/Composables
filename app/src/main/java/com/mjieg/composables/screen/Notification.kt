@@ -23,6 +23,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -103,9 +104,7 @@ private fun showSimpleNotification(context: Context) {
     val notificationId = 101
 
     // A. 点击通知后要执行的意图：回到 MainActivity
-    val intent = Intent(context, MainActivity::class.java).apply {
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-    }
+    val intent = Intent(context, MainActivity::class.java)
 
     // B. 将 Intent 包装成 PendingIntent
     val pendingIntent: PendingIntent = PendingIntent.getActivity(
@@ -138,32 +137,59 @@ private fun showSimpleNotification(context: Context) {
 }
 
 @Composable
-fun NotificationPermissionFinalSolution() {
+fun NotificationPermissionFinalUltra() {
     val context = LocalContext.current
     val activity = context as Activity
-
-    // 使用 SharedPreferences 记录是否曾经申请过权限
     val sharedPrefs = remember { context.getSharedPreferences("permission_prefs", Context.MODE_PRIVATE) }
 
-    // 状态管理
     var showSettingsDialog by remember { mutableStateOf(false) }
-    var hasPermission by remember {
-        mutableStateOf(
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-            } else true
-        )
+
+    // 动态检测通知是否真的开启（兼容所有 Android 版本）
+    val isNotificationsEnabled = {
+        NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
 
-    // 权限申请启动器
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasPermission = isGranted
-        // 只要触发了系统申请，就标记为“已申请过”
+    ) { _ ->
+        // 记录已经发起过请求
         sharedPrefs.edit().putBoolean("asked_notification_permission", true).apply()
+        // 回调时不弹窗，等待下一次用户点击
+    }
 
-        // 注意：这里我们不在回调里弹出自定义对话框，保证了拒绝后的“沉默”
+    LaunchedEffect(Unit) {
+        val enabled = isNotificationsEnabled()
+
+        if (!enabled) {
+            // 情况 2: 通知被禁用，区分版本处理
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                // --- Android 13+ 逻辑 ---
+                val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                    activity, Manifest.permission.POST_NOTIFICATIONS
+                )
+                val hasAskedBefore = sharedPrefs.getBoolean("asked_notification_permission", false)
+
+                when {
+                    shouldShowRationale -> {
+                        // 之前拒绝过，但没点“不再询问”，继续系统申请
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    !hasAskedBefore -> {
+                        // 第一次申请
+                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    }
+                    else -> {
+                        // 已经永久拒绝过，或者用户手动在设置里关了，弹自定义窗
+                        showSettingsDialog = true
+                    }
+                }
+            } else {
+                // --- Android 13 以下逻辑 ---
+                // 没有动态权限概念，只要 disabled 了，一定是用户手动去设置关的
+                // 直接弹窗引导用户去设置开启
+                showSettingsDialog = true
+            }
+        }
     }
 
     Column(
@@ -171,49 +197,56 @@ fun NotificationPermissionFinalSolution() {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(if (hasPermission) "权限已获得" else "权限未获得")
+        Text(if (isNotificationsEnabled()) "通知已开启" else "通知已禁用")
 
         Spacer(modifier = Modifier.height(20.dp))
 
         Button(onClick = {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val checkResult = ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-                val isGranted = checkResult == PackageManager.PERMISSION_GRANTED
-                val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)
-                val hasAskedBefore = sharedPrefs.getBoolean("asked_notification_permission", false)
+            val enabled = isNotificationsEnabled()
 
-                when {
-                    isGranted -> {
-                        // 已有权限，执行发送通知逻辑
-                        showSimpleNotification(context)
+            if (enabled) {
+                // 情况 1: 通知已开启，执行发送逻辑
+                showSimpleNotification(context)
+            } else {
+                // 情况 2: 通知被禁用，区分版本处理
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    // --- Android 13+ 逻辑 ---
+                    val shouldShowRationale = ActivityCompat.shouldShowRequestPermissionRationale(
+                        activity, Manifest.permission.POST_NOTIFICATIONS
+                    )
+                    val hasAskedBefore = sharedPrefs.getBoolean("asked_notification_permission", false)
+
+                    when {
+                        shouldShowRationale -> {
+                            // 之前拒绝过，但没点“不再询问”，继续系统申请
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        !hasAskedBefore -> {
+                            // 第一次申请
+                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                        else -> {
+                            // 已经永久拒绝过，或者用户手动在设置里关了，弹自定义窗
+                            showSettingsDialog = true
+                        }
                     }
-                    shouldShowRationale -> {
-                        // 用户之前拒绝过，但没勾选“不再询问”，继续尝试系统申请
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                    !hasAskedBefore -> {
-                        // 第一次申请，直接调用系统弹窗
-                        permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                    else -> {
-                        // 重点：走到这里说明 isGranted=false, shouldShowRationale=false, 且 hasAskedBefore=true
-                        // 这意味着用户之前勾选了“不再询问”。
-                        // 此时我们才显示自定义的引导对话框。
-                        showSettingsDialog = true
-                    }
+                } else {
+                    // --- Android 13 以下逻辑 ---
+                    // 没有动态权限概念，只要 disabled 了，一定是用户手动去设置关的
+                    // 直接弹窗引导用户去设置开启
+                    showSettingsDialog = true
                 }
             }
         }) {
-            Text("申请权限 / 发送通知")
+            Text("检查权限并发送通知")
         }
     }
 
-    // 自定义引导对话框
     if (showSettingsDialog) {
         AlertDialog(
             onDismissRequest = { showSettingsDialog = false },
-            title = { Text("通知功能已禁用") },
-            text = { Text("您之前拒绝了通知权限并选择了“不再询问”。为了正常使用，请前往设置手动开启。") },
+            title = { Text("通知权限受限") },
+            text = { Text("检测到您的通知开关已关闭。为了能及时收到消息，请前往设置开启通知。") },
             confirmButton = {
                 TextButton(onClick = {
                     showSettingsDialog = false
