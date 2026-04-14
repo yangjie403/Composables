@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.rememberSplineBasedDecay
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.AnchoredDraggableDefaults
 import androidx.compose.foundation.gestures.AnchoredDraggableState
 import androidx.compose.foundation.gestures.DraggableAnchors
 import androidx.compose.foundation.gestures.Orientation
@@ -40,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -140,23 +142,12 @@ fun SwipeableItem() {
     val menuWidth = 160.dp
     val menuWidthPx = with(density) { menuWidth.toPx() }
 
-    // 1. 定义衰减动画（新版本必须提供）
-    val decayAnimationSpec = rememberSplineBasedDecay<Float>()
-
-    // 2. 构造 AnchoredDraggableState
-    // 注意：构造函数里现在只有这些参数，没有 anchors
     val state = remember {
         AnchoredDraggableState(
-            initialValue = DragValue.Closed,
-            positionalThreshold = { distance: Float -> distance * 0.5f },
-            velocityThreshold = { with(density) { 100.dp.toPx() } },
-            snapAnimationSpec = tween(),
-            decayAnimationSpec = decayAnimationSpec
+            initialValue = DragValue.Closed
         )
     }
 
-    // 3. 使用 SideEffect 或 remember 更新锚点
-    // 当 menuWidthPx 变化时，重新更新锚点映射
     SideEffect {
         state.updateAnchors(
             DraggableAnchors {
@@ -165,18 +156,35 @@ fun SwipeableItem() {
             }
         )
     }
+    val flingBehavior = AnchoredDraggableDefaults.flingBehavior(
+        state = state,
+        positionalThreshold = { distance -> distance * 0.5f },
+        animationSpec = tween()
+    )
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(80.dp)
             .background(Color.White)
     ) {
-        // 3. 底层：菜单层 (Buttons)
+        // 底层：菜单层 (Buttons)
         Row(
             modifier = Modifier
                 .fillMaxHeight()
+                // 平移效果
+                // .offset {
+                //     IntOffset(state.requireOffset().roundToInt() + menuWidth.toPx().roundToInt(), 0)
+                // }
                 .align(Alignment.CenterEnd) // 靠右对齐
                 .width(menuWidth)
+                // 缩放效果
+                .graphicsLayer {
+                    val currentOffset = if (state.offset.isNaN()) 0f else state.requireOffset()
+                    // 计算缩放比例：范围 0f ~ 1f
+                    val scaleFraction = (-currentOffset / menuWidth.toPx()).coerceIn(0f, 1f)
+                    scaleX = scaleFraction
+                    transformOrigin = TransformOrigin(pivotFractionX = 1f, pivotFractionY = 0.5f)
+                }
         ) {
             // 菜单按钮：收藏
             Box(
@@ -204,7 +212,7 @@ fun SwipeableItem() {
             }
         }
 
-        // 4. 上层：内容层 (Item Content)
+        // 上层：内容层 (Item Content)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -212,7 +220,11 @@ fun SwipeableItem() {
                     // 应用滑动的偏移量
                     IntOffset(state.requireOffset().roundToInt(), 0)
                 }
-                .anchoredDraggable(state, Orientation.Horizontal) // 绑定拖动手势
+                .anchoredDraggable(
+                    state = state,
+                    orientation = Orientation.Horizontal,
+                    flingBehavior = flingBehavior
+                )
                 .background(Color.LightGray)
                 .padding(horizontal = 16.dp),
             contentAlignment = Alignment.CenterStart
