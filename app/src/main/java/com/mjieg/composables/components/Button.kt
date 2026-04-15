@@ -4,14 +4,20 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -25,10 +31,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import kotlin.math.PI
@@ -314,5 +324,111 @@ fun ZeroRecompositionLikeButton(onClick: (isLiked: Boolean) -> Unit = {}) {
                     }
             )
         }
+    }
+}
+
+@Composable
+fun CustomSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    width: Dp = 50.dp,
+    height: Dp = 28.dp,
+    checkedTrackColor: Color = Color(0xFF4CAF50),
+    uncheckedTrackColor: Color = Color(0xFF757575),
+    thumbColor: Color = Color.White,
+    gapBetweenThumbAndTrackEdge: Dp = 4.dp
+) {
+    val density = LocalDensity.current
+
+    // 1. 预先计算不变的数值，避免在重组中重复计算
+    val thumbSizeDp = height - (gapBetweenThumbAndTrackEdge * 2)
+    val thumbSizePx = with(density) { thumbSizeDp.toPx() }
+    val gapPx = with(density) { gapBetweenThumbAndTrackEdge.toPx() }
+    val widthPx = with(density) { width.toPx() }
+
+    // 计算滑块可以移动的最大位移
+    val maxTranslationPx = widthPx - thumbSizePx - gapPx
+
+    // 2. 动画状态
+    val progress by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = tween(durationMillis = 200),
+        label = "switch_progress"
+    )
+
+    // 3. 颜色动画（颜色无法简单通过 graphicsLayer 偏移，但可以用 drawBehind 优化）
+    val trackColor by animateColorAsState(
+        targetValue = if (checked) checkedTrackColor else uncheckedTrackColor,
+        label = "track_color"
+    )
+
+    Box(
+        modifier = modifier
+            .size(width, height)
+            .clip(CircleShape)
+            // 优化点 A：使用 drawBehind 替代 background
+            // 这样颜色变化时只触发绘制层更新，不触发重组
+            .drawBehind {
+                drawRect(trackColor)
+            }
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null
+            ) {
+                onCheckedChange(!checked)
+            },
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .size(thumbSizeDp)
+                // 优化点 B：使用 graphicsLayer 处理位移
+                // 这是一个 Lambda Modifier，动画执行时直接在 GPU 层操作
+                // 此时整个 CustomSwitch 函数不会重新执行（跳过 Recomposition 阶段）
+                .graphicsLayer {
+                    translationX = gapPx + (maxTranslationPx - gapPx) * progress
+                    shape = CircleShape
+                    clip = true
+                }
+                .background(thumbColor)
+        )
+    }
+}
+
+@Composable
+fun SwitchExample() {
+    var isChecked by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = Modifier.fillMaxSize().padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp)
+    ) {
+        // 1. 标准 Material 风格
+        CustomSwitch(
+            checked = isChecked,
+            onCheckedChange = { isChecked = it }
+        )
+
+        // 2. 像图片中那样的灰色风格（自定义颜色）
+        CustomSwitch(
+            checked = isChecked,
+            onCheckedChange = { isChecked = it },
+            width = 60.dp,
+            height = 34.dp,
+            checkedTrackColor = Color(0xFF9E9E9E), // 开启也是灰色
+            uncheckedTrackColor = Color(0xFF616161), // 关闭是深灰
+            gapBetweenThumbAndTrackEdge = 6.dp
+        )
+
+        // 3. 细长风格
+        CustomSwitch(
+            checked = isChecked,
+            onCheckedChange = { isChecked = it },
+            width = 100.dp,
+            height = 30.dp,
+            checkedTrackColor = Color.Magenta,
+            gapBetweenThumbAndTrackEdge = 2.dp
+        )
     }
 }
