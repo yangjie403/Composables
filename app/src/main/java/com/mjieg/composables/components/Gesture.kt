@@ -371,7 +371,9 @@ fun SwipeableItem(
         ) {
             Box(
                 modifier = Modifier
-                    .fillMaxHeight().weight(1f).background(Color(0xFF4CAF50)),
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .background(Color(0xFF4CAF50)),
                 contentAlignment = Alignment.Center
             ) {
                 IconButton(onClick = { Log.d("SwipeableItem", "收藏 $id") }) {
@@ -380,7 +382,9 @@ fun SwipeableItem(
             }
             Box(
                 modifier = Modifier
-                    .fillMaxHeight().weight(1f).background(Color.Red),
+                    .fillMaxHeight()
+                    .weight(1f)
+                    .background(Color.Red),
                 contentAlignment = Alignment.Center
             ) {
                 IconButton(onClick = { Log.d("SwipeableItem", "删除 $id") }) {
@@ -451,81 +455,61 @@ fun NestedScrollBottomSheet() {
     val nestedScrollConnection = remember(state) {
         object : NestedScrollConnection {
 
-            /**
-             * 预滚动回调：在子组件（如 LazyColumn）处理滚动之前调用
-             * 用于优先处理 BottomSheet 的展开/收起手势
-             *
-             * @param available 可用的滚动手势偏移量，y 轴负值表示向上滑动，正值表示向下滑动
-             * @param source 滚动来源（用户拖动或惯性滚动）
-             * @return 实际消耗的偏移量
-             */
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // 提取垂直方向的滚动增量
+                // 【关键修改 1】：只有用户真实手指拖动，才允许实时改变偏移量。拒绝惯性产生的假性滑动。
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+
                 val delta = available.y
-                // 获取当前面板的偏移量，如果为 NaN 则使用隐藏高度作为默认值
                 val offset = if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
 
-                // 判断条件：向上滑动(delta < 0) 且 面板未完全展开(offset > 0)
-                // 此时应该优先让面板展开，而不是让内部列表滚动
+                // 向上滑，且面板未完全展开时，优先展开面板
                 return if (delta < 0 && offset > 0f) {
-                    // 将滚动增量分发给 anchoredDraggableState，驱动面板向上展开
                     val consumed = state.dispatchRawDelta(delta)
-                    // 返回实际消耗的偏移量（x 轴不消耗，y 轴返回实际消耗值）
                     Offset(0f, consumed)
                 } else {
-                    // 其他情况不消耗滚动事件，交给子组件处理
                     Offset.Zero
                 }
             }
 
-            /**
-             * 后滚动回调：在子组件（如 LazyColumn）处理滚动之后调用
-             * 用于处理列表已滚动到顶部时，继续向下拉动以收起面板
-             *
-             * @param consumed 子组件已消耗的偏移量
-             * @param available 剩余的可用偏移量（子组件未消耗的部分）
-             * @param source 滚动来源
-             * @return 实际消耗的偏移量
-             */
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                // 提取剩余的垂直滚动增量
+                // 【关键修改 2】：同上，拦截惯性的假性滑动
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+
                 val delta = available.y
-                // 判断条件：向下滑动(delta > 0)，即用户试图向下拉
-                // 此时应该让面板跟随手指向下收起
+                // 列表滑到顶后，向下的拉力用来拉动面板
                 return if (delta > 0) {
-                    // 将向下的滚动增量分发给 anchoredDraggableState，驱动面板向下收起
                     val consumedDelta = state.dispatchRawDelta(delta)
-                    // 返回实际消耗的偏移量
                     Offset(0f, consumedDelta)
                 } else {
-                    // 向上滑动时不在此处处理（已在 onPreScroll 中处理）
                     Offset.Zero
                 }
             }
 
-            // 【关键修复点】：完美处理松手后的吸附
             override suspend fun onPreFling(available: Velocity): Velocity {
                 val offset = if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
                 val velocityY = available.y
 
-                // 判断：只要 offset 不在顶点 (0f) 也不在底点 (hiddenHeightPx)，说明面板悬停在半空
-                val isIntermediate = offset > 0f && offset < hiddenHeightPx
+                // 场景A：手指向上飞划，且面板未完全展开 -> 直接展开面板
+                if (velocityY < 0 && offset > 0f) {
+                    state.animateTo(BottomSheetState.Expanded)
+                    return available // 吞掉速度，不让列表发生滚动
+                }
 
+                // 场景B：手指拖拽面板到一半，缓慢松手 或 飞划松手
+                val isIntermediate = offset > 0f && offset < hiddenHeightPx
                 if (isIntermediate) {
-                    // 1. 根据速度或当前位置决定去向
+                    // 根据速度或当前所处的位置，智能判断去向
                     val targetState = when {
-                        velocityY > velocityThresholdPx -> BottomSheetState.Collapsed // 快速向下划
-                        velocityY < -velocityThresholdPx -> BottomSheetState.Expanded // 快速向上划
-                        offset > hiddenHeightPx / 2f -> BottomSheetState.Collapsed    // 缓慢松手，且偏下
-                        else -> BottomSheetState.Expanded                             // 缓慢松手，且偏上
+                        velocityY > velocityThresholdPx -> BottomSheetState.Collapsed
+                        velocityY < -velocityThresholdPx -> BottomSheetState.Expanded
+                        offset > hiddenHeightPx / 2f -> BottomSheetState.Collapsed
+                        else -> BottomSheetState.Expanded
                     }
-                    // 2. 强制执行吸附动画
                     state.animateTo(targetState)
-                    // 3. 消耗掉手势，不要传给列表
                     return available
                 }
 
@@ -533,11 +517,21 @@ fun NestedScrollBottomSheet() {
             }
 
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                // 如果列表已经滚动到顶部，且还有向下的残余冲击力，收起面板
+                val offset = if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
+
+                // 场景C：【你遇到的Bug的终极解法】
+                // 列表猛烈向下滑动撞到了顶部，产生了巨大的向下残余冲击力
                 if (available.y > 0) {
                     state.animateTo(BottomSheetState.Collapsed)
                     return available
                 }
+
+                // 终极兜底保障：不管发生什么，只要一切滑动结束，如果面板还没吸附，强制吸附
+                if (offset > 0f && offset < hiddenHeightPx) {
+                    val targetState = if (offset > hiddenHeightPx / 2f) BottomSheetState.Collapsed else BottomSheetState.Expanded
+                    state.animateTo(targetState)
+                }
+
                 return Velocity.Zero
             }
         }
@@ -565,7 +559,8 @@ fun NestedScrollBottomSheet() {
                 .height(sheetFullHeight)
                 // 3. 应用滑动偏移量
                 .offset {
-                    val currentOffset = if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
+                    val currentOffset =
+                        if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
                     IntOffset(x = 0, y = currentOffset.roundToInt())
                 }
                 // 4. 绑定嵌套滑动 (极其重要：绑定在容器最外层，必须在 draggable 之前)
@@ -611,6 +606,75 @@ fun NestedScrollBottomSheet() {
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+fun CollapsingToolbarExample() {
+    val toolbarHeight = 80.dp
+    val toolbarHeightPx = with(LocalDensity.current) { toolbarHeight.roundToPx().toFloat() }
+
+    // 状态：记录 Toolbar 的偏移量（范围是 -toolbarHeightPx 到 0）
+    var toolbarOffsetPx by remember { mutableFloatStateOf(0f) }
+
+    // 1. 创建 NestedScrollConnection
+    val nestedScrollConnection = remember {
+        object : NestedScrollConnection {
+
+            // 阶段 1：拖拽前。优先处理向上滑动（隐藏Toolbar）
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                val delta = available.y
+
+                // 假设 delta < 0 (向上滑动) 或 delta > 0 (向下滑动)
+                // 我们在拖拽前拦截滑动事件，用来改变 Toolbar 的位置
+                val newOffset = toolbarOffsetPx + delta
+
+                // 限制偏移量在 [-80px, 0px] 之间
+                val coercedOffset = newOffset.coerceIn(-toolbarHeightPx, 0f)
+
+                // 计算我们实际消耗掉的像素值
+                val consumed = coercedOffset - toolbarOffsetPx
+                toolbarOffsetPx = coercedOffset
+
+                // 告诉子组件：我们消耗了 consumed 这么多，剩下的你拿去滑
+                return Offset(0f, consumed)
+            }
+        }
+    }
+
+    // 2. 将 Connection 绑定到父级容器上
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(nestedScrollConnection) // 必须绑定在包裹列表的外层！
+    ) {
+        // 3. 子组件：列表
+        LazyColumn(
+            // 为了不让 Toolbar 挡住第一行数据，加上 paddingTop
+            contentPadding = PaddingValues(top = toolbarHeight)
+        ) {
+            items(100) { index ->
+                Text(
+                    text = "我是列表内容 $index",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                )
+            }
+        }
+
+        // 4. 父组件：折叠标题栏
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(toolbarHeight)
+                // 根据滑动的偏移量移动 Toolbar
+                .offset { IntOffset(x = 0, y = toolbarOffsetPx.roundToInt()) }
+                .background(Color.Blue),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("可以折叠的标题栏", color = Color.White, style = MaterialTheme.typography.titleLarge)
         }
     }
 }
