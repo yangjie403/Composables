@@ -455,83 +455,126 @@ fun NestedScrollBottomSheet() {
     val nestedScrollConnection = remember(state) {
         object : NestedScrollConnection {
 
+            /**
+             * 预滚动回调：在子组件（如 LazyColumn）处理滚动之前调用
+             * 用于优先处理 BottomSheet 的展开/收起手势
+             *
+             * @param available 可用的滚动手势偏移量，y 轴负值表示向上滑动，正值表示向下滑动
+             * @param source 滚动来源（用户拖动或惯性滚动）
+             * @return 实际消耗的偏移量
+             */
             override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                // 【关键修改 1】：只有用户真实手指拖动，才允许实时改变偏移量。拒绝惯性产生的假性滑动。
                 if (source != NestedScrollSource.UserInput) return Offset.Zero
-
+                // 提取垂直方向的滚动增量
                 val delta = available.y
+                // 获取当前面板的偏移量，如果为 NaN 则使用隐藏高度作为默认值
                 val offset = if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
 
-                // 向上滑，且面板未完全展开时，优先展开面板
+                // 判断条件：向上滑动(delta < 0) 且 面板未完全展开(offset > 0)
+                // 此时应该优先让面板展开，而不是让内部列表滚动
                 return if (delta < 0 && offset > 0f) {
+                    // 将滚动增量分发给 anchoredDraggableState，驱动面板向上展开
                     val consumed = state.dispatchRawDelta(delta)
+                    // 返回实际消耗的偏移量（x 轴不消耗，y 轴返回实际消耗值）
                     Offset(0f, consumed)
                 } else {
+                    // 其他情况不消耗滚动事件，交给子组件处理
                     Offset.Zero
                 }
             }
 
+            /**
+             * 后滚动回调：在子组件（如 LazyColumn）处理滚动之后调用
+             * 用于处理列表已滚动到顶部时，继续向下拉动以收起面板
+             *
+             * @param consumed 子组件已消耗的偏移量
+             * @param available 剩余的可用偏移量（子组件未消耗的部分）
+             * @param source 滚动来源
+             * @return 实际消耗的偏移量
+             */
             override fun onPostScroll(
                 consumed: Offset,
                 available: Offset,
                 source: NestedScrollSource
             ): Offset {
-                // 【关键修改 2】：同上，拦截惯性的假性滑动
-                if (source != NestedScrollSource.UserInput) return Offset.Zero
 
+                if (source != NestedScrollSource.UserInput) return Offset.Zero
+                // 提取剩余的垂直滚动增量
                 val delta = available.y
-                // 列表滑到顶后，向下的拉力用来拉动面板
+                // 判断条件：向下滑动(delta > 0)，即用户试图向下拉
+                // 此时应该让面板跟随手指向下收起
                 return if (delta > 0) {
+                    // 将向下的滚动增量分发给 anchoredDraggableState，驱动面板向下收起
                     val consumedDelta = state.dispatchRawDelta(delta)
+                    // 返回实际消耗的偏移量
                     Offset(0f, consumedDelta)
                 } else {
+                    // 向上滑动时不在此处处理（已在 onPreScroll 中处理）
                     Offset.Zero
                 }
             }
 
+            /**
+             * 预惯性滚动回调：在用户快速滑动松手后、惯性动画开始前调用
+             * 用于处理 BottomSheet 面板的吸附逻辑，确保松手后面板能自动吸附到展开或收起状态
+             *
+             * @param available 可用的惯性速度，y 轴正值表示向下惯性，负值表示向上惯性
+             * @return 实际消耗的速度（返回 available 表示完全消耗，Velocity.Zero 表示不消耗）
+             */
             override suspend fun onPreFling(available: Velocity): Velocity {
+                // 获取当前面板的垂直偏移量，如果为 NaN 则使用隐藏高度作为默认值
                 val offset = if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
+                // 提取垂直方向的惯性速度
                 val velocityY = available.y
 
-                // 场景A：手指向上飞划，且面板未完全展开 -> 直接展开面板
-                if (velocityY < 0 && offset > 0f) {
-                    state.animateTo(BottomSheetState.Expanded)
-                    return available // 吞掉速度，不让列表发生滚动
-                }
-
-                // 场景B：手指拖拽面板到一半，缓慢松手 或 飞划松手
+                // 判断面板是否处于中间状态（既未完全展开也未完全收起）
+                // offset > 0f：面板未完全展开（完全展开时 offset = 0）
+                // offset < hiddenHeightPx：面板未完全收起（完全收起时 offset = hiddenHeightPx）
                 val isIntermediate = offset > 0f && offset < hiddenHeightPx
+
                 if (isIntermediate) {
-                    // 根据速度或当前所处的位置，智能判断去向
+                    // 面板悬停在半空，需要根据位置决定吸附目标状态
+                    // 1. 根据当前位置决定去向（已注释掉速度判断逻辑）
                     val targetState = when {
-                        velocityY > velocityThresholdPx -> BottomSheetState.Collapsed
-                        velocityY < -velocityThresholdPx -> BottomSheetState.Expanded
-                        offset > hiddenHeightPx / 2f -> BottomSheetState.Collapsed
-                        else -> BottomSheetState.Expanded
+                        // 原逻辑：根据惯性速度大小判断
+                        // velocityY > velocityThresholdPx -> BottomSheetState.Collapsed // 快速向下划，吸附到收起状态
+                        // velocityY < -velocityThresholdPx -> BottomSheetState.Expanded // 快速向上划，吸附到展开状态
+                        
+                        // 现逻辑：仅根据面板当前位置判断
+                        offset > hiddenHeightPx / 2f -> BottomSheetState.Collapsed    // 面板位置偏下（超过一半），吸附到收起状态
+                        else -> BottomSheetState.Expanded                             // 面板位置偏上（未过半），吸附到展开状态
                     }
+                    
+                    // 2. 强制执行吸附动画，将面板平滑过渡到目标状态
+                    // animateTo 是 suspend 函数，会等待动画完成后再继续执行
                     state.animateTo(targetState)
+                    
+                    // 3. 消耗掉所有惯性速度，阻止惯性传递给内部列表
+                    // 这样可以避免面板吸附过程中列表还在惯性滚动
                     return available
                 }
 
+                // 面板已在顶点或底点，不处理惯性，交给子组件处理
                 return Velocity.Zero
             }
 
+            /**
+             * 后惯性滚动回调：在子组件处理完惯性滚动之后调用
+             * 可用于处理特殊情况下的面板收起逻辑（当前已注释）
+             *
+             * @param consumed 子组件已消耗的惯性速度
+             * @param available 剩余的可用惯性速度（子组件未消耗的部分）
+             * @return 实际消耗的速度
+             */
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
-                val offset = if (state.offset.isNaN()) hiddenHeightPx else state.requireOffset()
-
-                // 场景C：【你遇到的Bug的终极解法】
-                // 列表猛烈向下滑动撞到了顶部，产生了巨大的向下残余冲击力
-                if (available.y > 0) {
-                    state.animateTo(BottomSheetState.Collapsed)
-                    return available
-                }
-
-                // 终极兜底保障：不管发生什么，只要一切滑动结束，如果面板还没吸附，强制吸附
-                if (offset > 0f && offset < hiddenHeightPx) {
-                    val targetState = if (offset > hiddenHeightPx / 2f) BottomSheetState.Collapsed else BottomSheetState.Expanded
-                    state.animateTo(targetState)
-                }
-
+                // 原逻辑：如果列表已滚动到顶部，且还有向下的残余惯性速度，则收起面板
+                // 适用场景：用户在列表顶部快速向下滑动，希望直接收起 BottomSheet
+                //if (available.y > 0) {
+                //    state.animateTo(BottomSheetState.Collapsed)
+                //    return available
+                //}
+                
+                // 当前禁用此逻辑，不处理后惯性事件
                 return Velocity.Zero
             }
         }
@@ -638,7 +681,7 @@ fun CollapsingToolbarExample() {
                 toolbarOffsetPx = coercedOffset
 
                 // 告诉子组件：我们消耗了 consumed 这么多，剩下的你拿去滑
-                return Offset(0f, consumed)
+                return Offset(0f, 0f)
             }
         }
     }
