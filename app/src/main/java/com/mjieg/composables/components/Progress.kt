@@ -1,5 +1,6 @@
 package com.mjieg.composables.components
 
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
@@ -10,12 +11,14 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
@@ -39,6 +42,7 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -48,6 +52,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -55,6 +62,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.mjieg.composables.R
 import kotlinx.coroutines.delay
@@ -250,4 +258,71 @@ fun ImageRotationLoading(
                 }
         )
     }
+}
+
+@Composable
+fun CustomGradientProgress(
+    progress: Float, // 0.0 到 1.0
+    gradient: List<Color>,
+    modifier: Modifier = Modifier,
+    trackColor: Color = Color(0xFFE5E5E5),
+    height: Dp = 8.dp
+) {
+    // 使用 animateFloatAsState 让进度变化更平滑
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = ProgressIndicatorDefaults.ProgressAnimationSpec,
+        label = "progress"
+    )
+
+    Canvas(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(height / 2)
+            .height(height)
+    ) {
+        val width = size.width
+        val height = size.height
+        val strokeWidth = height // 高度即为线条宽度
+
+        // 1. 绘制背景底条
+        drawLine(
+            color = trackColor,
+            start = Offset(0f, height / 2),
+            end = Offset(width, height / 2),
+            cap = StrokeCap.Round,
+            strokeWidth = strokeWidth
+        )
+
+        // 2. 绘制渐变进度条
+        if (animatedProgress > 0f) {
+            drawLine(
+                brush = Brush.linearGradient(colors = gradient),
+                start = Offset(0f, height / 2),
+                end = Offset(width * animatedProgress, height / 2),
+                cap = StrokeCap.Round,
+                strokeWidth = strokeWidth
+            )
+        }
+    }
+}
+
+@Composable
+fun GradientProgressExample() {
+    val progress = remember { Animatable(0f) }
+
+    LaunchedEffect(Unit) {
+        progress.animateTo(
+            targetValue = 1f,
+            animationSpec = tween(
+                durationMillis = 4000,
+                easing = LinearEasing
+            )
+        )
+    }
+    CustomGradientProgress(
+        progress = progress.value,
+        gradient = listOf(Color.Red, Color.Blue, Color.Green),
+        height = 4.dp
+    )
 }
