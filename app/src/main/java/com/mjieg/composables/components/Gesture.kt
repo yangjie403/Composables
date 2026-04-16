@@ -753,7 +753,7 @@ fun ImageCropperDemo() {
 
     // 使用 remember 加载优化过的 Bitmap，避免重复加载
     val imageBitmap = remember {
-        decodeSampledBitmapFromResource(context, R.drawable.xx, screenWidth, screenHeight)
+        decodeSampledBitmapFromResource(context, R.drawable.steve, screenWidth, screenHeight)
     }
 
     // 2. 状态变量
