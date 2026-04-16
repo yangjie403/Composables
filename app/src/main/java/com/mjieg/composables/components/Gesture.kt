@@ -1,8 +1,12 @@
 package com.mjieg.composables.components
 
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,17 +56,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.scale
+import com.mjieg.composables.R
 import kotlin.math.roundToInt
 
 private const val TAG = "Gesture"
@@ -539,16 +555,16 @@ fun NestedScrollBottomSheet() {
                         // 原逻辑：根据惯性速度大小判断
                         // velocityY > velocityThresholdPx -> BottomSheetState.Collapsed // 快速向下划，吸附到收起状态
                         // velocityY < -velocityThresholdPx -> BottomSheetState.Expanded // 快速向上划，吸附到展开状态
-                        
+
                         // 现逻辑：仅根据面板当前位置判断
                         offset > hiddenHeightPx / 2f -> BottomSheetState.Collapsed    // 面板位置偏下（超过一半），吸附到收起状态
                         else -> BottomSheetState.Expanded                             // 面板位置偏上（未过半），吸附到展开状态
                     }
-                    
+
                     // 2. 强制执行吸附动画，将面板平滑过渡到目标状态
                     // animateTo 是 suspend 函数，会等待动画完成后再继续执行
                     state.animateTo(targetState)
-                    
+
                     // 3. 消耗掉所有惯性速度，阻止惯性传递给内部列表
                     // 这样可以避免面板吸附过程中列表还在惯性滚动
                     return available
@@ -569,11 +585,11 @@ fun NestedScrollBottomSheet() {
             override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
                 // 原逻辑：如果列表已滚动到顶部，且还有向下的残余惯性速度，则收起面板
                 // 适用场景：用户在列表顶部快速向下滑动，希望直接收起 BottomSheet
-                //if (available.y > 0) {
+                // if (available.y > 0) {
                 //    state.animateTo(BottomSheetState.Collapsed)
                 //    return available
                 //}
-                
+
                 // 当前禁用此逻辑，不处理后惯性事件
                 return Velocity.Zero
             }
@@ -717,7 +733,176 @@ fun CollapsingToolbarExample() {
                 .background(Color.Blue),
             contentAlignment = Alignment.Center
         ) {
-            Text("可以折叠的标题栏", color = Color.White, style = MaterialTheme.typography.titleLarge)
+            Text(
+                "可以折叠的标题栏",
+                color = Color.White,
+                style = MaterialTheme.typography.titleLarge
+            )
         }
     }
+}
+
+@Composable
+fun ImageCropperDemo() {
+    val context = LocalContext.current
+
+    // 1. 加载 Bitmap
+    val displayMetrics = context.resources.displayMetrics
+    val screenWidth = displayMetrics.widthPixels
+    val screenHeight = displayMetrics.heightPixels
+
+    // 使用 remember 加载优化过的 Bitmap，避免重复加载
+    val imageBitmap = remember {
+        decodeSampledBitmapFromResource(context, R.drawable.xx, screenWidth, screenHeight)
+    }
+
+    // 2. 状态变量
+    var containerSize by remember { mutableStateOf(IntSize.Zero) }
+    var scale by remember { mutableStateOf(1f) }
+    var offset by remember { mutableStateOf(Offset.Zero) }
+
+    // 裁剪框设定（假设为 250dp 的正方形）
+    val cropSizePx = with(androidx.compose.ui.platform.LocalDensity.current) { 250.dp.toPx() }
+    val cropRectSize = Size(cropSizePx, cropSizePx)
+
+    // 3. 计算约束逻辑
+    // 当容器大小确定后，计算初始最小缩放比例
+    val minScale = remember(containerSize, imageBitmap) {
+        if (containerSize == IntSize.Zero) 1f else {
+            val widthScale = cropRectSize.width / imageBitmap.width
+            val heightScale = cropRectSize.height / imageBitmap.height
+            // 取最大值，确保宽和高都至少大于等于裁剪框
+            maxOf(widthScale, heightScale)
+        }
+    }
+    val maxScale by remember {
+        mutableFloatStateOf(4f)
+    }
+
+    // 初始缩放设为 minScale
+    LaunchedEffect(minScale) {
+        scale = minScale
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.DarkGray)
+            .onGloballyPositioned { containerSize = it.size },
+        contentAlignment = Alignment.Center
+    ) {
+        // 4. 下层：图片绘制（使用 Canvas 方便精确控制位移和缩放）
+        Canvas(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(imageBitmap, containerSize) {
+                    detectTransformGestures { _, pan, zoom, _ ->
+                        // 更新缩放
+                        val targetScale = (scale * zoom).coerceIn(minScale, maxScale)
+
+                        // 更新位移并应用边界约束
+                        val newScale = targetScale
+                        val newOffset = offset + pan
+
+                        // 计算当前缩放后的图片尺寸
+                        val scaledWidth = imageBitmap.width * newScale
+                        val scaledHeight = imageBitmap.height * newScale
+
+                        // 边界计算：图片边缘不能进入裁剪框
+                        // 图片相对于中心点的最大允许偏移量
+                        val maxOffsetX = (scaledWidth - cropRectSize.width) / 2
+                        val maxOffsetY = (scaledHeight - cropRectSize.height) / 2
+
+                        scale = newScale
+                        offset = Offset(
+                            x = newOffset.x.coerceIn(-maxOffsetX, maxOffsetX),
+                            y = newOffset.y.coerceIn(-maxOffsetY, maxOffsetY)
+                        )
+                    }
+                }
+        ) {
+            // 将绘图坐标系移至中心
+            withTransform({
+                translate(size.width / 2f + offset.x, size.height / 2f + offset.y)
+                scale(scale, scale, pivot = Offset.Zero)
+            }) {
+                // 绘制图片，中心点对齐
+                drawImage(
+                    image = imageBitmap,
+                    topLeft = Offset(-imageBitmap.width / 2f, -imageBitmap.height / 2f)
+                )
+            }
+        }
+
+        // 5. 上层：蒙层与裁剪框
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val canvasWidth = size.width
+            val canvasHeight = size.height
+
+            val left = (canvasWidth - cropRectSize.width) / 2
+            val top = (canvasHeight - cropRectSize.height) / 2
+
+            val outerPath = Path().apply {
+                addRect(Rect(0f, 0f, canvasWidth, canvasHeight))
+            }
+            val innerPath = Path().apply {
+                addRect(Rect(left, top, left + cropRectSize.width, top + cropRectSize.height))
+            }
+
+            // 绘制半透明蒙层（差集填充）
+            val combinedPath = Path.combine(PathOperation.Difference, outerPath, innerPath)
+            drawPath(combinedPath, color = Color.Black.copy(alpha = 0.7f))
+
+            // 绘制裁剪框白边
+            drawRect(
+                color = Color.White,
+                topLeft = Offset(left, top),
+                size = cropRectSize,
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx())
+            )
+        }
+    }
+}
+
+// --- 优化 1: 安全加载 Bitmap 的工具函数 ---
+fun decodeSampledBitmapFromResource(context: Context, resId: Int, reqWidth: Int, reqHeight: Int): ImageBitmap {
+    val options = BitmapFactory.Options().apply {
+        // 只检查尺寸
+        inJustDecodeBounds = true
+        BitmapFactory.decodeResource(context.resources, resId, this)
+
+        // 计算缩放倍数（inSampleSize 只能是 2 的幂）
+        inSampleSize = calculateInSampleSize(this, reqWidth, reqHeight)
+
+        // 正式加载
+        inJustDecodeBounds = false
+        // 建议使用 RGB_565 减少一半内存开销（如果不需要透明度）
+        inPreferredConfig = Bitmap.Config.ARGB_8888
+    }
+
+    val bitmap = BitmapFactory.decodeResource(context.resources, resId, options)
+
+    // --- 优化 2: 如果图片依然超过 GPU 纹理限制 (通常是 4096)，进行强制压缩 ---
+    val maxTextureSize = 4096
+    return if (bitmap.width > maxTextureSize || bitmap.height > maxTextureSize) {
+        val scale = maxTextureSize.toFloat() / maxOf(bitmap.width, bitmap.height)
+        val scaledBitmap =
+            bitmap.scale((bitmap.width * scale).toInt(), (bitmap.height * scale).toInt())
+        scaledBitmap.asImageBitmap()
+    } else {
+        bitmap.asImageBitmap()
+    }
+}
+
+fun calculateInSampleSize(options: BitmapFactory.Options, reqWidth: Int, reqHeight: Int): Int {
+    val (height: Int, width: Int) = options.outHeight to options.outWidth
+    var inSampleSize = 1
+    if (height > reqHeight || width > reqWidth) {
+        val halfHeight = height / 2
+        val halfWidth = width / 2
+        while (halfHeight / inSampleSize >= reqHeight && halfWidth / inSampleSize >= reqWidth) {
+            inSampleSize *= 2
+        }
+    }
+    return inSampleSize
 }
