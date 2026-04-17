@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#ECE5DD"> <!-- 类似 WhatsApp 的背景色 -->
+
+    <!-- 附件菜单卡片 (默认隐藏) -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/attachmentMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginHorizontal="16dp"
+        android:layout_marginBottom="8dp"
+        android:visibility="invisible"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp"
+        app:layout_constraintBottom_toTopOf="@+id/bottomBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent">
+
+        <!-- 菜单内的网格项 (模拟文档、相机、图库等) -->
+        <GridLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:columnCount="3"
+            android:padding="16dp"
+            android:alignmentMode="alignBounds"
+            android:useDefaultMargins="true">
+
+            <Button android:text="文档" android:drawableTop="@android:drawable/ic_menu_agenda" style="?android:attr/borderlessButtonStyle"/>
+            <Button android:text="相机" android:drawableTop="@android:drawable/ic_menu_camera" style="?android:attr/borderlessButtonStyle"/>
+            <Button android:text="图库" android:drawableTop="@android:drawable/ic_menu_gallery" style="?android:attr/borderlessButtonStyle"/>
+            <Button android:text="音频" android:drawableTop="@android:drawable/ic_media_play" style="?android:attr/borderlessButtonStyle"/>
+            <Button android:text="位置" android:drawableTop="@android:drawable/ic_menu_mylocation" style="?android:attr/borderlessButtonStyle"/>
+            <Button android:text="联系人" android:drawableTop="@android:drawable/ic_menu_myplaces" style="?android:attr/borderlessButtonStyle"/>
+
+        </GridLayout>
+    </androidx.cardview.widget.CardView>
+
+    <!-- 底部操作栏 -->
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="8dp"
+        android:gravity="center_vertical"
+        app:layout_constraintBottom_toBottomOf="parent">
+
+        <EditText
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="输入消息..."
+            android:background="@android:color/white"
+            android:padding="12dp" />
+
+        <!-- 触发动画的附件按钮 -->
+        <ImageButton
+            android:id="@+id/btnAttach"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:layout_marginStart="8dp"
+            android:background="?selectableItemBackgroundBorderless"
+            android:src="@android:drawable/ic_menu_add" />
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>
