@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,13 +57,25 @@ data class Contact(val name: String, val initial: String)
 fun AlphabetNavSampleScreen() {
     // 1. 模拟数据准备
     val contacts = remember {
-        val names = listOf(
-            "Alice", "Apple", "Bob", "Banner", "David", "Dog", "Edward",
-            "Frank", "George", "Henry", "Ivan", "Jack", "Karl", "Linda", "Macy",
-            "Nancy", "Oliver", "Peter", "Queen", "Robert", "Steve", "Tesla",
-            "Ulysses", "Vivian", "William", "Xavier", "Yolanda", "Zebra"
+        val rawNames = listOf(
+            "Alice", "Apple", "Bob", "David", "Frank", "George",
+            "Henry", "Ivan", "Jack", "Karl", "Linda", "Macy",
+            "Nancy", "Oliver", "Peter", "Queen", "Robert",
+            "Steve", "Tesla", "William", "Xavier", "Zebra",
+            "123 客服", "@测试账号", "7-Eleven", "张三", "李四",
+            "124 客服", "@测试账号", "7-Eleven", "张三", "李四",
         )
-        names.map { Contact(it, it.take(1).uppercase()) }.sortedBy { it.name }
+
+        rawNames.map { name ->
+            // 获取第一个字符并转大写，如果为空（防崩溃）则设为 '#'
+            val firstChar = name.firstOrNull()?.uppercaseChar() ?: '#'
+            // 如果是大写字母 A-Z 留作 initial，否则一律归为 '#'
+            val initial = if (firstChar in 'A'..'Z') firstChar.toString() else "#"
+            Contact(name, initial)
+        }.sortedWith(
+            // 排序规则：先按是不是 '#' 排（false排在前面，true排在最后），再按名称字母排
+            compareBy<Contact> { it.initial == "#" }.thenBy { it.name }
+        )
     }
 
     // 【核心修复 1】: 将联系人按照首字母分组
@@ -70,11 +83,11 @@ fun AlphabetNavSampleScreen() {
         contacts.groupBy { it.initial }
     }
 
-    // val alphabet = remember { ('A'..'Z').map { it.toString() } + "#" }
+    val alphabet = remember { ('A'..'Z').map { it.toString() } + "#" }
     // 如果只需要显示联系人列表中存在的首字母
-    val alphabet = remember(contacts) {
-        contacts.map { it.initial }.distinct()
-    }
+    // val alphabet = remember(contacts) {
+    //     contacts.map { it.initial }.distinct()
+    // }
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -83,15 +96,14 @@ fun AlphabetNavSampleScreen() {
         val map = mutableMapOf<String, Int>()
         var currentIndex = 0
 
-        // 1. 正向遍历分组，计算存在的字母所在的 LazyList Index
         groupedContacts.forEach { (initial, list) ->
             map[initial] = currentIndex
-            // currentIndex 需要加上 Header(1个) 和 该组下的联系人数量
             currentIndex += 1 + list.size
         }
 
-        // 2. 倒序遍历字母表，为不存在的字母填充“下一个最近字母”的 Index
-        var nextAvailableIndex = currentIndex
+        // 【修复点】：防止尾部越界。如果没有任何联系人，安全索引为 0；否则为最大安全索引 currentIndex - 1
+        var nextAvailableIndex = (currentIndex - 1).coerceAtLeast(0)
+
         for (i in alphabet.indices.reversed()) {
             val letter = alphabet[i]
             if (map.containsKey(letter)) {
@@ -130,7 +142,13 @@ fun AlphabetNavSampleScreen() {
                     }
 
                     // 列表项占据后续的 Item 位置
-                    items(contactsForInitial, key = { it.name }) { contact ->
+                    itemsIndexed(
+                        items = contactsForInitial,
+                        key = { index, contact ->
+                            // 组合示例: "item_A_Alice_0", "item_A_Alice_1"
+                            "item_${initial}_${contact.name}_$index"
+                        }
+                    ) { _, contact ->
                         ContactItem(contact.name)
                     }
                 }
@@ -263,9 +281,9 @@ fun AlphabetIndexer(
             ) {
                 Text(
                     text = alphabet[activeIndex],
-                    fontSize = 32.sp,
+                    fontSize = 24.sp,
                     color = Color.White,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Medium
                 )
             }
         }
