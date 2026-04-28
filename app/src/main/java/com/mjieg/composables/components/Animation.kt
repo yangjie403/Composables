@@ -5,12 +5,15 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -21,11 +24,16 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -420,5 +428,95 @@ fun AnimateOffsetAsStateExample() {
                 .size(100.dp)
                 .background(MaterialTheme.colorScheme.tertiary)
         )
+    }
+}
+
+@Preview
+@Composable
+fun AlternatingSlideList() {
+    val items = List(50) { "Item #$it" }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        itemsIndexed(items) { index, item ->
+            // 使用 MutableTransitionState 来确保组件一挂载就触发动画
+            val visibleState = remember {
+                MutableTransitionState(false).apply { targetState = true }
+            }
+
+            // 根据奇偶行决定滑入方向
+            val slideInEnter = if (index % 2 == 0) {
+                // 偶数行：从左侧滑入
+                slideInHorizontally(animationSpec = tween(500)) { fullWidth -> -fullWidth } + fadeIn()
+            } else {
+                // 奇数行：从右侧滑入
+                slideInHorizontally(animationSpec = tween(500)) { fullWidth -> fullWidth } + fadeIn()
+            }
+
+            AnimatedVisibility(
+                visibleState = visibleState,
+                enter = slideInEnter
+            ) {
+                ListItemCard(text = item)
+            }
+        }
+    }
+}
+
+@Composable
+fun ListItemCard(text: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(16.dp)
+        )
+    }
+}
+
+private val LowOnStartEasing = CubicBezierEasing(0.0f, 0.0f, 0.2f, 1.0f)
+
+@Preview
+@Composable
+fun PreciseAlternatingList() {
+    val items = List(50) { "Item #$it" }
+
+    LazyColumn {
+        itemsIndexed(items) { index, item ->
+            // 每一个 Item 维护自己的动画偏量
+            val animatable = remember { Animatable(if (index % 2 == 0) -1f else 1f) }
+            val alpha = remember { Animatable(0f) }
+
+            // 当 Item 进入 composition 时，启动动画
+            LaunchedEffect(Unit) {
+                launch {
+                    animatable.animateTo(
+                        targetValue = 0f,
+                        animationSpec = tween(durationMillis = 600, easing = LowOnStartEasing)
+                    )
+                }
+                launch {
+                    alpha.animateTo(1f, tween(600))
+                }
+            }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        // 将偏量映射到像素位移，0.5f 表示滑过半个屏幕宽度
+                        translationX = animatable.value * size.width
+                        this.alpha = alpha.value
+                    }
+                    .padding(8.dp)
+            ) {
+                ListItemCard(text = item)
+            }
+        }
     }
 }
