@@ -1,6 +1,5 @@
 package com.mjieg.composables.components
 
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
@@ -161,7 +160,8 @@ fun EqualRemainingSpaceRow(
 
         // 2. 计算剩余空间
         // 确保如果有外层约束限制了最大宽度才进行计算，否则没有剩余空间
-        val maxWidth = if (constraints.hasBoundedWidth) constraints.maxWidth else totalIntrinsicWidth
+        val maxWidth =
+            if (constraints.hasBoundedWidth) constraints.maxWidth else totalIntrinsicWidth
         val remainingWidth = (maxWidth - totalIntrinsicWidth).coerceAtLeast(0)
 
         // 3. 将剩余空间均分给每个组件
@@ -305,7 +305,7 @@ fun DynamicSlidingSegmentedControl(
 }
 
 @Composable
-fun DragableDynamicSlidingSegmentedControl(
+fun DraggableDynamicSlidingSegmentedControl(
     options: List<String>,
     selectedIndex: Int,
     onSelectionChange: (Int) -> Unit
@@ -335,10 +335,16 @@ fun DragableDynamicSlidingSegmentedControl(
                     isInitialMeasure = false
                 } else {
                     launch {
-                        indicatorOffset.animateTo(target.second, spring(stiffness = Spring.StiffnessLow))
+                        indicatorOffset.animateTo(
+                            target.second,
+                            spring(stiffness = Spring.StiffnessLow)
+                        )
                     }
                     launch {
-                        indicatorWidth.animateTo(target.first, spring(stiffness = Spring.StiffnessLow))
+                        indicatorWidth.animateTo(
+                            target.first,
+                            spring(stiffness = Spring.StiffnessLow)
+                        )
                     }
                 }
             }
@@ -374,8 +380,18 @@ fun DragableDynamicSlidingSegmentedControl(
                             val target = itemLayouts[targetIndex]
                             if (target != null) {
                                 coroutineScope.launch {
-                                    launch { indicatorOffset.animateTo(target.second, spring(stiffness = Spring.StiffnessLow)) }
-                                    launch { indicatorWidth.animateTo(target.first, spring(stiffness = Spring.StiffnessLow)) }
+                                    launch {
+                                        indicatorOffset.animateTo(
+                                            target.second,
+                                            spring(stiffness = Spring.StiffnessLow)
+                                        )
+                                    }
+                                    launch {
+                                        indicatorWidth.animateTo(
+                                            target.first,
+                                            spring(stiffness = Spring.StiffnessLow)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -386,8 +402,18 @@ fun DragableDynamicSlidingSegmentedControl(
                             val target = itemLayouts[selectedIndex]
                             if (target != null) {
                                 coroutineScope.launch {
-                                    launch { indicatorOffset.animateTo(target.second, spring(stiffness = Spring.StiffnessLow)) }
-                                    launch { indicatorWidth.animateTo(target.first, spring(stiffness = Spring.StiffnessLow)) }
+                                    launch {
+                                        indicatorOffset.animateTo(
+                                            target.second,
+                                            spring(stiffness = Spring.StiffnessLow)
+                                        )
+                                    }
+                                    launch {
+                                        indicatorWidth.animateTo(
+                                            target.first,
+                                            spring(stiffness = Spring.StiffnessLow)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -400,7 +426,8 @@ fun DragableDynamicSlidingSegmentedControl(
                                 val maxOffset = itemLayouts[options.lastIndex]?.second ?: 0f
 
                                 // 判断是否越界
-                                val isOutOfBounds = indicatorOffset.value < minOffset || indicatorOffset.value > maxOffset
+                                val isOutOfBounds =
+                                    indicatorOffset.value < minOffset || indicatorOffset.value > maxOffset
 
                                 // 阻尼感核心：
                                 // 正常拖动：轻微阻尼 (0.85f)，感觉滑块比较实沉
@@ -411,7 +438,8 @@ fun DragableDynamicSlidingSegmentedControl(
                                 indicatorOffset.snapTo(newOffset)
 
                                 // 动态计算拖拽时的滑块宽度（当选项宽度不同时，平滑过渡宽度）
-                                val newWidth = calculateInterpolatedWidth(newOffset, itemLayouts, options.size)
+                                val newWidth =
+                                    calculateInterpolatedWidth(newOffset, itemLayouts, options.size)
                                 if (newWidth != null) {
                                     indicatorWidth.snapTo(newWidth)
                                 }
@@ -490,7 +518,11 @@ private fun findClosestIndex(currentX: Float, itemLayouts: Map<Int, Pair<Float, 
 /**
  * 如果各个 Tab 的宽度不一样长，拖动时平滑过渡宽度
  */
-private fun calculateInterpolatedWidth(currentX: Float, itemLayouts: Map<Int, Pair<Float, Float>>, size: Int): Float? {
+private fun calculateInterpolatedWidth(
+    currentX: Float,
+    itemLayouts: Map<Int, Pair<Float, Float>>,
+    size: Int
+): Float? {
     if (itemLayouts.size < size) return null
 
     val minLayout = itemLayouts[0]!!
@@ -557,7 +589,10 @@ fun IOSSegmentedControl(
             if (!isDragging) {
                 thumbOffsetX.animateTo(
                     targetValue = currentSelectedIndex * segmentWidthPx,
-                    animationSpec = spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+                    animationSpec = spring(
+                        dampingRatio = 0.8f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
                 )
             }
         }
@@ -568,7 +603,8 @@ fun IOSSegmentedControl(
                 detectTapGestures(
                     onPress = { offset ->
                         // 手指按下的瞬间 (onPress) 就立即触发选中事件
-                        val tappedIndex = (offset.x / segmentWidthPx).toInt().coerceIn(0, options.size - 1)
+                        val tappedIndex =
+                            (offset.x / segmentWidthPx).toInt().coerceIn(0, options.size - 1)
                         currentOnOptionSelected(tappedIndex)
                     }
                 )
@@ -584,7 +620,8 @@ fun IOSSegmentedControl(
                     onDragCancel = { isDragging = false },
                     onHorizontalDrag = { change, _ ->
                         // 计算拖拽时滑块应该在的像素位置 (限制在最左和最右边界内)
-                        val newTargetX = (change.position.x + dragGrabOffset).coerceIn(0f, maxOffsetX)
+                        val newTargetX =
+                            (change.position.x + dragGrabOffset).coerceIn(0f, maxOffsetX)
 
                         coroutineScope.launch {
                             // 使用 snapTo 去掉动画，实现完全跟手的 0 延迟拖拽
@@ -603,17 +640,34 @@ fun IOSSegmentedControl(
             }
 
         // UI 渲染层
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(gestureModifier) // 将所有手势挂载在最外层 Box
+        BoxWithConstraints(
+            modifier = modifier
+                .height(32.dp)
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(backgroundColor)
+                .padding(2.dp)
+                .then(gestureModifier)
         ) {
             // 1. 渲染滑动背景块 (Thumb)
-            val thumbOffsetDp = with(density) { thumbOffsetX.value.toDp() }
+            val segmentWidth = maxWidth / options.size
+            val thumbOffsetState = animateDpAsState(
+                targetValue = segmentWidth * selectedIndex,
+                animationSpec = spring(
+                    dampingRatio = 0.8f,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "ThumbOffset"
+            )
+
+            // 2. 绘制滑块 (背景块)
             Box(
                 modifier = Modifier
-                    .offset(x = thumbOffsetDp)
-                    .width(segmentWidthDp)
+                    // 2. 【核心性能优化】：使用 Lambda 版本的 offset
+                    // 这使得动画数值的读取发生在 Layout 阶段，彻底跳过 重组(Composition)
+                    .offset {
+                        IntOffset(x = thumbOffsetState.value.roundToPx(), y = 0)
+                    }
+                    .width(segmentWidth)
                     .fillMaxHeight()
                     .shadow(elevation = 1.dp, shape = RoundedCornerShape(thumbCornerRadius))
                     .background(color = thumbColor, shape = RoundedCornerShape(thumbCornerRadius))
@@ -624,12 +678,6 @@ fun IOSSegmentedControl(
                 options.forEachIndexed { index, text ->
                     val isSelected = index == currentSelectedIndex
 
-                    // 文本颜色渐变动画 (滑块经过时文字颜色平滑过渡)
-                    val textColor by animateColorAsState(
-                        targetValue = if (isSelected) selectedTextColor else unselectedTextColor,
-                        label = "TextColor"
-                    )
-
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -638,7 +686,7 @@ fun IOSSegmentedControl(
                     ) {
                         Text(
                             text = text,
-                            color = textColor,
+                            color = if (isSelected) selectedTextColor else unselectedTextColor,
                             fontSize = 13.sp,
                             fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                             textAlign = TextAlign.Center
@@ -687,7 +735,10 @@ fun IOSVariableWidthSegmentedControl(
                 thumbWidth.snapTo(targetWidth)
             } else {
                 launch {
-                    thumbWidth.animateTo(targetWidth, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+                    thumbWidth.animateTo(
+                        targetWidth,
+                        spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+                    )
                 }
             }
         }
@@ -702,7 +753,10 @@ fun IOSVariableWidthSegmentedControl(
                 isThumbInitialized = true // 初始化完成
             } else {
                 launch {
-                    thumbX.animateTo(targetX, spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow))
+                    thumbX.animateTo(
+                        targetX,
+                        spring(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+                    )
                 }
             }
         }
@@ -802,15 +856,10 @@ fun IOSVariableWidthSegmentedControl(
                         .padding(horizontal = 16.dp), // 控制左右内边距，文字越长宽度越大
                     contentAlignment = Alignment.Center
                 ) {
-                    // 仅选中的文字会触发这一小块区域的重组，非常轻量
-                    val textColor by animateColorAsState(
-                        targetValue = if (isSelected) selectedTextColor else unselectedTextColor,
-                        label = "TextColor"
-                    )
-
+                    // 【改动点】：去掉了 animateColorAsState，瞬间变色
                     Text(
                         text = text,
-                        color = textColor,
+                        color = if (isSelected) selectedTextColor else unselectedTextColor,
                         fontSize = 13.sp,
                         fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
                         textAlign = TextAlign.Center
@@ -840,7 +889,7 @@ fun ExampleScreen() {
             onSelectionChange = { selectedIndex = it }
         )
         Spacer(modifier = Modifier.size(20.dp))
-        DragableDynamicSlidingSegmentedControl(
+        DraggableDynamicSlidingSegmentedControl(
             options = items,
             selectedIndex = selectedIndex,
             onSelectionChange = { selectedIndex = it }
