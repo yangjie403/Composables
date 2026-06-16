@@ -1,20 +1,34 @@
 package com.mjieg.composables.components
 
 import android.util.Log
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDp
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateIntOffsetAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -27,11 +41,16 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LocalContentColor
@@ -41,13 +60,21 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
@@ -67,6 +94,7 @@ import kotlin.math.roundToInt
 
 
 private const val TAG = "Animation"
+
 @Composable
 fun AnimatedButton(
     text: String,
@@ -415,7 +443,10 @@ fun AnimateOffsetAsStateExample() {
             modifier = Modifier
                 .layout { measurable, constraints ->
                     val placeable = measurable.measure(constraints)
-                    Log.d(TAG, "AnimateOffsetAsStateExample: ${placeable.width.toDp()} x ${placeable.height.toDp()}")
+                    Log.d(
+                        TAG,
+                        "AnimateOffsetAsStateExample: ${placeable.width.toDp()} x ${placeable.height.toDp()}"
+                    )
                     layout(placeable.width + offset.x, placeable.height + offset.y) {
                         placeable.placeRelative(offset)
                     }
@@ -518,5 +549,222 @@ fun PreciseAlternatingList() {
                 ListItemCard(text = item)
             }
         }
+    }
+}
+
+@Composable
+fun AnimateAsStateExample() {
+    var isExpanded by remember { mutableStateOf(false) }
+
+    val size by animateDpAsState(
+        targetValue = if (isExpanded) 200.dp else 100.dp,
+        label = "size_anim"
+    )
+    val color by animateColorAsState(
+        targetValue = if (isExpanded) Color.Red else Color.Cyan,
+        label = "color_anim"
+    )
+    Box(
+        modifier = Modifier
+            .size(size)
+            .background(color)
+            .clickable { isExpanded = !isExpanded }
+    )
+}
+
+@Composable
+fun AnimatedContentExample() {
+    var count by remember { mutableIntStateOf(0) }
+
+    Column {
+        Button(onClick = { count++ }) {
+            Text("加 1")
+        }
+        AnimatedContent(
+            targetState = count,
+            transitionSpec = {
+                (slideInVertically { height -> height } + fadeIn()) togetherWith
+                        (slideOutVertically { height -> -height } + fadeOut())
+            },
+            label = "counter"
+        ) { targetCount ->
+            // 注意：这里必须使用传递进来的 targetCount 渲染 UI
+            Text(text = "当前数字: $targetCount", style = MaterialTheme.typography.headlineMedium)
+        }
+    }
+}
+
+enum class BoxState { Collapsed, Expanded }
+
+@Composable
+fun TransitionExample() {
+    var currentState by remember { mutableStateOf(BoxState.Collapsed) }
+    val transition = updateTransition(
+        targetState = currentState,
+        label = "transition"
+    )
+    val size by transition.animateDp(label = "size") { state ->
+        if (state == BoxState.Collapsed) 100.dp else 200.dp
+    }
+    val cornerRadius by transition.animateDp(label = "radius") { state ->
+        if (state == BoxState.Collapsed) 20.dp else 10.dp
+    }
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(RoundedCornerShape(cornerRadius))
+            .background(Color.Blue)
+            .clickable {
+                currentState =
+                    if (currentState == BoxState.Collapsed) BoxState.Expanded else BoxState.Collapsed
+            }
+    )
+}
+
+@Composable
+fun AnimatableExample() {
+    val offsetX = remember { Animatable(0f) }
+    val alpha = remember { Animatable(1f) }
+    val scope = rememberCoroutineScope()
+
+    Column {
+        Button(onClick = {
+            scope.launch {
+                offsetX.animateTo(100f, tween(500))
+                alpha.animateTo(0f, tween(500))
+                offsetX.snapTo(0f)
+                alpha.snapTo(1f)
+            }
+        }) {
+            Text("开始串行动画")
+        }
+        Box(
+            modifier = Modifier
+                .size(100.dp)
+                .offset(x = offsetX.value.dp)
+                .background(Color.Magenta.copy(alpha = alpha.value))
+        )
+    }
+}
+
+@Composable
+fun RadarScanExample() {
+    val infiniteTransition = rememberInfiniteTransition(label = "radar")
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    val radarBrush = Brush.sweepGradient(
+        colorStops = arrayOf(
+            0.0f to Color.Transparent,
+            0.8f to Color.Green.copy(0.2f),
+            0.99f to Color.Green.copy(0.7f),
+            1f to Color.Transparent
+        ),
+        center = Offset.Zero
+    )
+
+    Box(
+        modifier = Modifier
+            .size(200.dp)
+            .clip(CircleShape)
+            .border(2.dp, Color.Green, CircleShape)
+            .drawBehind {
+                translate(left = size.width / 2, top = size.height / 2) {
+                    rotate(degrees = rotation, pivot = Offset.Zero) {
+                        drawCircle(brush = radarBrush,
+                            center = Offset(0f, 0f),
+                            radius = size.width / 2)
+                    }
+                }
+            }
+    )
+}
+
+@Composable
+fun EnterExitAnimationExample() {
+    var visible by remember { mutableStateOf(false) }
+
+    Column(modifier = Modifier.padding(16.dp)) {
+        Button(onClick = { visible = !visible }) {
+            Text(if (visible) "隐藏组件" else "显示组件")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // 使用 AnimatedVisibility
+        AnimatedVisibility(
+            visible = visible,
+
+            // ================= 入场动画组合 =================
+            enter = fadeIn(
+                // 1. 淡入：初始透明度 0.3，耗时 500ms
+                initialAlpha = 0.3f,
+                animationSpec = tween(500)
+            ) + slideInVertically(
+                // 2. 垂直滑入：从下方滑入 (起始位置为自身高度的正值)
+                initialOffsetY = { fullHeight -> fullHeight / 2 },
+                animationSpec = tween(500)
+            ) + expandVertically(
+                // 3. 垂直展开：从顶部开始向下展开
+                expandFrom = Alignment.Top,
+                animationSpec = tween(500)
+            ),
+
+            // ================= 退场动画组合 =================
+            exit = fadeOut(
+                // 1. 淡出
+                targetAlpha = 0f,
+                animationSpec = tween(300)
+            ) + slideOutHorizontally(
+                // 2. 向右滑出屏幕：目标位置是自身宽度
+                targetOffsetX = { fullWidth -> fullWidth },
+                animationSpec = tween(300)
+            ) + shrinkVertically(
+                // 3. 收缩：向底部收缩消失
+                shrinkTowards = Alignment.Bottom,
+                animationSpec = tween(300)
+            )
+        ) {
+            // 被动画包裹的 UI 组件
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .background(Color.Blue)
+            ) {
+                Text(
+                    text = "我是一个带华丽动画的 Box",
+                    color = Color.White,
+                    modifier = Modifier.align(Alignment.Center)
+                )
+            }
+        }
+
+        // 下方的组件，用来演示 Expand/Shrink 会自动推挤布局
+        Text("我是下方的文本，上面出现时我会被挤下去！", modifier = Modifier.padding(top = 16.dp))
+    }
+}
+
+@Preview
+@Composable
+fun AnimateApiExamplePreview() {
+    Column(
+        modifier = Modifier.verticalScroll(rememberScrollState()),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        AnimateAsStateExample()
+        AnimatedVisibilityExample()
+        AnimatedContentExample()
+        TransitionExample()
+        RadarScanExample()
+        EnterExitAnimationExample()
+        AnimatableExample()
     }
 }
