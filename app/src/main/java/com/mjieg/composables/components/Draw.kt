@@ -2,9 +2,11 @@ package com.mjieg.composables.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,13 +14,16 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -52,6 +57,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mjieg.composables.R
@@ -317,9 +323,11 @@ fun CompositingStrategyExamples() {
         ) {
             drawRect(color = Color.Magenta, size = Size(200.dp.toPx(), 200.dp.toPx()))
         }
-        Spacer(modifier = Modifier
-            .size(300.dp)
-            .border(1.dp, color = Color.Red))
+        Spacer(
+            modifier = Modifier
+                .size(300.dp)
+                .border(1.dp, color = Color.Red)
+        )
         Canvas(
             modifier = Modifier
                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
@@ -349,5 +357,156 @@ fun FlippedModifierExample() {
             .flipped()
     ) {
         Text("我翻转了")
+    }
+}
+
+fun Modifier.scrollFadeEdges(
+    scrollState: ScrollState,
+    isVertical: Boolean = true,
+    fadeSize: Dp = 16.dp,
+    maxAlphaDistanceFactor: Float = 0.3f
+): Modifier {
+    return this
+        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+        .drawWithContent {
+            val fadeSizePx = fadeSize.toPx()
+            val currentScroll = scrollState.value.toFloat()
+            val maxScroll = scrollState.maxValue.toFloat()
+            if (maxScroll <= 0f) {
+                drawContent()
+                return@drawWithContent
+            }
+
+            fun calculateFadeAlpha(distance: Float): Float {
+                val normalized = (distance / (fadeSizePx * maxAlphaDistanceFactor)).coerceIn(0f, 1f)
+                return 1 - normalized
+            }
+
+            val startAlpha = calculateFadeAlpha(currentScroll)
+            val endAlpha = calculateFadeAlpha(maxScroll - currentScroll)
+            drawContent()
+            if (isVertical) {
+                if (startAlpha < 1) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = startAlpha),
+                                Color.Black
+                            ),
+                            startY = 0f,
+                            endY = fadeSizePx
+                        ),
+                        size = Size(width = size.width, height = fadeSizePx),
+                        blendMode = BlendMode.DstIn,
+                        topLeft = Offset.Zero
+                    )
+                }
+                if (endAlpha < 1) {
+                    drawRect(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black,
+                                Color.Black.copy(alpha = endAlpha)
+                            ),
+                            startY = size.height - fadeSizePx,
+                            endY = size.height
+                        ),
+                        size = Size(size.width, fadeSizePx),
+                        blendMode = BlendMode.DstIn,
+                        topLeft = Offset(0f, size.height - fadeSizePx)
+                    )
+                }
+            } else {
+                if (startAlpha < 1) {
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = startAlpha),
+                                Color.Black
+                            ),
+                            startX = 0f,
+                            endX = fadeSizePx,
+                        ),
+                        size = Size(fadeSizePx, size.height),
+                        blendMode = BlendMode.DstIn,
+                        topLeft = Offset.Zero
+                    )
+                }
+                if (endAlpha < 1) {
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(
+                                Color.Black,
+                                Color.Black.copy(alpha = endAlpha)
+                            ),
+                            startX = size.width - fadeSizePx,
+                            endX = size.width
+                        ),
+                        size = Size(fadeSizePx, size.height),
+                        blendMode = BlendMode.DstIn,
+                        topLeft = Offset(size.width - fadeSizePx, 0f)
+                    )
+                }
+            }
+        }
+}
+
+@Composable
+fun ScrollFadeEdgesExample() {
+    val verticalScrollState = rememberScrollState()
+    val horizontalScrollState = rememberScrollState()
+    Column {
+        Column(
+            modifier = Modifier
+                .size(width = 100.dp, height = 200.dp)
+                .scrollFadeEdges(verticalScrollState, fadeSize = 30.dp, maxAlphaDistanceFactor = 1f)
+                .verticalScroll(verticalScrollState),
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(Color.Blue)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(Color.Red)
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(Color.Magenta)
+            )
+        }
+        Row(
+            modifier = Modifier
+                .size(width = 200.dp, height = 100.dp)
+                .scrollFadeEdges(
+                    horizontalScrollState,
+                    isVertical = false,
+                    fadeSize = 30.dp,
+                    maxAlphaDistanceFactor = 1f
+                )
+                .horizontalScroll(horizontalScrollState)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(Color.Blue)
+            )
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(Color.Red)
+            )
+            Box(
+                modifier = Modifier
+                    .size(100.dp)
+                    .background(Color.Magenta)
+            )
+        }
     }
 }
