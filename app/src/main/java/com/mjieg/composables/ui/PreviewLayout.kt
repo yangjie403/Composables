@@ -1,5 +1,7 @@
 package com.mjieg.composables.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.wrapContentSize
@@ -10,9 +12,9 @@ import androidx.compose.ui.Modifier
 
 @Composable
 fun PreviewLayout(
-    content: @Composable () -> Unit
+    content: @Composable BoxScope.() -> Unit
 ) {
-    Surface(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .wrapContentSize(Alignment.Center)

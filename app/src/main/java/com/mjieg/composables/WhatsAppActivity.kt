@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.view.View
 import android.view.ViewAnimationUtils
 import android.widget.ImageButton
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import kotlin.math.hypot
@@ -30,6 +31,19 @@ class WhatsAppActivity : AppCompatActivity() {
                 revealMenu()
             }
         }
+
+        // 注册返回键回调以拦截并禁用返回手势/物理键
+        // 传入 this 作为 LifecycleOwner，当 Activity 销毁时，该回调会自动注销，防止内存泄漏
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // 在这里什么都不做，即可达到屏蔽返回手势/返回键的效果
+                if (isMenuOpen) {
+                    hideMenu()
+                } else {
+                    finish()
+                }
+            }
+        })
     }
 
     private fun revealMenu() {

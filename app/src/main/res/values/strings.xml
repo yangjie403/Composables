@@ -1,4 +1,5 @@
 <resources>
     <string name="app_name">Composables</string>
     <string name="home">主页</string>
+    <string name="screen_width" translatable="false">小于600dp</string>
 </resources>
