@@ -28,6 +28,8 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import kotlin.math.abs
+import kotlin.math.sign
 import kotlin.math.sin
 import kotlin.random.Random
 
@@ -225,59 +227,89 @@ fun SimpleSlidingChart(
     lineColor: Color = Color(0xFF00BCD4),
     fillColor: Color = Color(0xFF00BCD4).copy(alpha = 0.2f)
 ) {
-    // 预分配内存，拒绝绘制时的 GC 卡顿
     val strokePath = remember { Path() }
     val fillPath = remember { Path() }
     val brushColors = remember(fillColor) { listOf(fillColor, Color.Transparent) }
 
     Canvas(modifier = modifier) {
-        // 【核心】读取该状态，当外部调用 buffer.add() 时，这里会被标记为 Dirty 并自动重绘
-        buffer.updateCount
+        buffer.updateCount // 触发重绘
+
+        if (buffer.capacity < 2) return@Canvas
 
         val width = size.width
         val height = size.height
         val paddingY = 20.dp.toPx()
         val availableHeight = height - paddingY * 2
 
-        // 计算相邻点之间的固定间距 (比如宽度是900px, 那么 dx 就是 3px)
         val dx = width / (buffer.capacity - 1).coerceAtLeast(1).toFloat()
-
-        // 获取 Y 轴最大值，保证下限不为 0
         val dynamicMax = buffer.getMax().coerceAtLeast(0.1f)
 
-        // 清空上一帧的路径
         strokePath.reset()
         fillPath.reset()
 
-        var prevX = 0f
-        var prevY = 0f
+        // 遍历所有数据，以“线段”为单位(从 i 到 i+1)绘制专业的平滑曲线
+        for (i in 0 until buffer.capacity - 1) {
+            val x0 = i * dx
+            val y0 = height - paddingY - (buffer[i] / dynamicMax) * availableHeight
 
-        // 遍历数组，计算位置并构建三阶贝塞尔平滑曲线
-        for (i in 0 until buffer.capacity) {
-            val value = buffer[i]
+            val x1 = (i + 1) * dx
+            val y1 = height - paddingY - (buffer[i + 1] / dynamicMax) * availableHeight
 
-            // X 轴直接按索引乘间距，不需要任何偏移补偿
-            val x = i * dx
-            // Y 轴根据当前最大值动态等比计算
-            val y = height - paddingY - (value / dynamicMax) * availableHeight
+            // 1. 获取前驱点和后继点的 Y 坐标 (处理边界条件)
+            val yPrev = if (i > 0) {
+                height - paddingY - (buffer[i - 1] / dynamicMax) * availableHeight
+            } else {
+                y0 - (y1 - y0)
+            }
+
+            val yNextNext = if (i + 2 < buffer.capacity) {
+                height - paddingY - (buffer[i + 2] / dynamicMax) * availableHeight
+            } else {
+                y1 + (y1 - y0)
+            }
+
+            // 2. 利用 Catmull-Rom 估算端点处的初始斜率
+            var slope0 = (y1 - yPrev) / 2f
+            var slope1 = (yNextNext - y0) / 2f
+
+            // 3. 核心：单调性约束 (Fritsch-Carlson 算法)
+            // 解决过冲(Overshoot)问题，并且保证线性数据渲染为绝对的直线！
+            val deltaY = y1 - y0
+            if (deltaY == 0f) {
+                // 两点水平，强制切线水平
+                slope0 = 0f
+                slope1 = 0f
+            } else {
+                // 如果端点斜率方向与线段方向相反，强制归零
+                if (slope0 * deltaY < 0f) slope0 = 0f
+                if (slope1 * deltaY < 0f) slope1 = 0f
+
+                // 限制最大斜率，不超过线段绝对斜率的 3 倍，避免曲率过大隆起
+                val maxSlope = 3f * abs(deltaY)
+                if (abs(slope0) > maxSlope) slope0 = sign(slope0) * maxSlope
+                if (abs(slope1) > maxSlope) slope1 = sign(slope1) * maxSlope
+            }
+
+            // 4. 根据校正后的斜率计算贝塞尔控制点
+            val cp1x = x0 + dx / 3f
+            val cp1y = y0 + slope0 / 3f
+
+            val cp2x = x1 - dx / 3f
+            val cp2y = y1 - slope1 / 3f
 
             if (i == 0) {
-                strokePath.moveTo(x, y)
-            } else {
-                val cpX = prevX + (x - prevX) / 2f
-                strokePath.cubicTo(cpX, prevY, cpX, y, x, y)
+                strokePath.moveTo(x0, y0)
             }
-            prevX = x
-            prevY = y
+            strokePath.cubicTo(cp1x, cp1y, cp2x, cp2y, x1, y1)
         }
 
-        // 闭合填充路径
+        // 拼接填充路径
         fillPath.addPath(strokePath)
-        fillPath.lineTo(prevX, height)
+        val lastX = (buffer.capacity - 1) * dx
+        fillPath.lineTo(lastX, height)
         fillPath.lineTo(0f, height)
         fillPath.close()
 
-        // 绘制渐变填充
         drawPath(
             path = fillPath,
             brush = Brush.verticalGradient(
@@ -287,7 +319,6 @@ fun SimpleSlidingChart(
             )
         )
 
-        // 绘制贝塞尔线条本身
         drawPath(
             path = strokePath,
             color = lineColor,
@@ -303,8 +334,8 @@ fun SimpleSlidingChart(
 @Composable
 fun UltimateChartDemo() {
     // 1. 初始化我们写好的底层环形缓冲区，全 0
-    val chartBuffer = remember { ChartRingBuffer(capacity = 100) }
-    val interval = 200L // 生成一次数据时间间隔
+    val chartBuffer = remember { ChartRingBuffer(capacity = 60) }
+    val interval = 1000L // 生成一次数据时间间隔
 
     // 2. 模拟传感器高速推送数据
     LaunchedEffect(Unit) {
@@ -315,7 +346,7 @@ fun UltimateChartDemo() {
 
             val wave = (sin(phase) + 1f) * 50f
             // 偶尔来个异常极峰，验证最大值自适应变化
-            val spike = if (Random.nextFloat() > 0.95f) 180f else 0f
+            val spike = if (Random.nextFloat() > 0.97f) 180f else 0f
 
             chartBuffer.add(wave + spike + Random.nextFloat() * 5f)
         }
@@ -325,6 +356,6 @@ fun UltimateChartDemo() {
         buffer = chartBuffer,
         modifier = Modifier
             .fillMaxWidth()
-            .height(250.dp)
+            .height(200.dp)
     )
 }
