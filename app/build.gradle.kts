@@ -49,6 +49,8 @@ dependencies {
     implementation(libs.androidx.adaptive)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.lifecycle.process)
+    implementation(libs.material)
+    implementation(libs.androidx.activity)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
