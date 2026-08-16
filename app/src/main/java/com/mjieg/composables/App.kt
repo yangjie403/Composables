@@ -107,7 +107,7 @@ class App: Application() {
 
     override fun onCreate() {
         super.onCreate()
-        registerActivityLifecycleCallbacks(activityTracker)
-        ProcessLifecycleOwner.get().lifecycle.addObserver(AppLifecycleObserver(activityTracker))
+        // registerActivityLifecycleCallbacks(activityTracker)
+        // ProcessLifecycleOwner.get().lifecycle.addObserver(AppLifecycleObserver(activityTracker))
     }
 }

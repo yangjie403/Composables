@@ -7,11 +7,15 @@ import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -19,11 +23,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mjieg.composables.components.CompactText
 import com.mjieg.composables.components.ScrollFadeEdgesExample
+import com.mjieg.composables.components.parallax.ParallaxView
+import com.mjieg.composables.components.parallax.model.ContainerSettings
 import com.mjieg.composables.screen.DrawerAppScreen
+import com.mjieg.composables.screen.UltimateChartDemo
 import com.mjieg.composables.ui.PreviewLayout
 import com.mjieg.composables.ui.theme.ComposablesTheme
 
 private const val TAG = "MainActivity"
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,7 +41,20 @@ class MainActivity : ComponentActivity() {
         setContent {
             ComposablesTheme {
                 PreviewLayout {
-                    Text(text = stringResource(R.string.screen_width))
+                    // Text(text = stringResource(R.string.screen_width))
+                    // UltimateChartDemo()
+                    ParallaxView(
+                        modifier = Modifier.fillMaxSize(),
+                        backgroundContent = {
+                            Image(
+                                painter = painterResource(R.drawable.wallpaper),
+                                modifier = Modifier.fillMaxSize(),
+                                contentDescription = "",
+                                contentScale = ContentScale.Crop
+                            )
+                        },
+                        backgroundContainerSettings = ContainerSettings(scale = 1.4f)
+                    )
                 }
             }
         }
