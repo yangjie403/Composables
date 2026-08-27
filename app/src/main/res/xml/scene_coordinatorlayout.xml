@@ -2,92 +2,100 @@
 <MotionScene xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:motion="http://schemas.android.com/apk/res-auto">
 
+    <!-- 起止状态使用Layout -->
     <Transition
-        motion:constraintSetEnd="@+id/end"
-        motion:constraintSetStart="@+id/start"
+        motion:constraintSetEnd="@layout/motion_end_layout"
+        motion:constraintSetStart="@layout/motion_start_layout"
         motion:duration="1000"
         motion:motionInterpolator="linear" />
 
-    <ConstraintSet android:id="@+id/start">
+    <!-- 起止状态使用ConstraintSet -->
+    <!--<Transition-->
+    <!--    motion:constraintSetEnd="@+id/end"-->
+    <!--    motion:constraintSetStart="@+id/start"-->
+    <!--    motion:duration="1000"-->
+    <!--    motion:motionInterpolator="linear" />-->
 
-        <Constraint
-            android:id="@+id/background"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintEnd_toEndOf="parent"
-            motion:layout_constraintStart_toStartOf="parent"
-            motion:layout_constraintTop_toTopOf="parent" />
+    <!--<ConstraintSet android:id="@+id/start">-->
 
-        <Constraint
-            android:id="@+id/name"
-            android:layout_width="162dp"
-            android:layout_height="30dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="8dp"
-            motion:layout_constraintBottom_toBottomOf="@+id/textView"
-            motion:layout_constraintEnd_toEndOf="parent"
-            motion:layout_constraintStart_toStartOf="parent"
-            motion:layout_constraintTop_toBottomOf="@+id/icon" />
+    <!--    <Constraint-->
+    <!--        android:id="@+id/background"-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        motion:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        motion:layout_constraintEnd_toEndOf="parent"-->
+    <!--        motion:layout_constraintStart_toStartOf="parent"-->
+    <!--        motion:layout_constraintTop_toTopOf="parent" />-->
 
-        <Constraint
-            android:id="@+id/icon"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="8dp"
-            android:background="@drawable/circle"
-            android:foreground="@drawable/circle"
-            motion:layout_constraintBottom_toTopOf="@+id/name"
-            motion:layout_constraintEnd_toEndOf="parent"
-            motion:layout_constraintStart_toStartOf="parent"
-            motion:layout_constraintTop_toTopOf="parent"
-            motion:layout_constraintVertical_chainStyle="packed" />
+    <!--    <Constraint-->
+    <!--        android:id="@+id/name"-->
+    <!--        android:layout_width="162dp"-->
+    <!--        android:layout_height="30dp"-->
+    <!--        android:layout_marginStart="8dp"-->
+    <!--        android:layout_marginTop="8dp"-->
+    <!--        android:layout_marginEnd="8dp"-->
+    <!--        motion:layout_constraintBottom_toBottomOf="@+id/textView"-->
+    <!--        motion:layout_constraintEnd_toEndOf="parent"-->
+    <!--        motion:layout_constraintStart_toStartOf="parent"-->
+    <!--        motion:layout_constraintTop_toBottomOf="@+id/icon" />-->
 
-        <Constraint
-            android:id="@+id/textView"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="8dp"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintEnd_toEndOf="parent"
-            motion:layout_constraintStart_toStartOf="parent"
-            motion:layout_constraintTop_toBottomOf="@id/name" />
-    </ConstraintSet>
+    <!--    <Constraint-->
+    <!--        android:id="@+id/icon"-->
+    <!--        android:layout_width="64dp"-->
+    <!--        android:layout_height="64dp"-->
+    <!--        android:layout_marginStart="8dp"-->
+    <!--        android:layout_marginTop="8dp"-->
+    <!--        android:layout_marginEnd="8dp"-->
+    <!--        android:background="@drawable/circle"-->
+    <!--        android:foreground="@drawable/circle"-->
+    <!--        motion:layout_constraintBottom_toTopOf="@+id/name"-->
+    <!--        motion:layout_constraintEnd_toEndOf="parent"-->
+    <!--        motion:layout_constraintStart_toStartOf="parent"-->
+    <!--        motion:layout_constraintTop_toTopOf="parent"-->
+    <!--        motion:layout_constraintVertical_chainStyle="packed" />-->
 
-    <ConstraintSet android:id="@+id/end">
-        <Constraint
-            android:id="@id/background"
-            android:layout_width="0dp"
-            android:layout_height="0dp"
-            android:visibility="invisible"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintEnd_toEndOf="parent"
-            motion:layout_constraintStart_toStartOf="parent"
-            motion:layout_constraintTop_toTopOf="parent" />
+    <!--    <Constraint-->
+    <!--        android:id="@+id/textView"-->
+    <!--        android:layout_width="wrap_content"-->
+    <!--        android:layout_height="wrap_content"-->
+    <!--        android:layout_marginStart="8dp"-->
+    <!--        android:layout_marginTop="8dp"-->
+    <!--        android:layout_marginEnd="8dp"-->
+    <!--        motion:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        motion:layout_constraintEnd_toEndOf="parent"-->
+    <!--        motion:layout_constraintStart_toStartOf="parent"-->
+    <!--        motion:layout_constraintTop_toBottomOf="@id/name" />-->
+    <!--</ConstraintSet>-->
 
-        <Constraint
-            android:id="@+id/name"
-            android:layout_width="wrap_content"
-            android:layout_height="20dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="8dp"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintStart_toStartOf="parent" />
+    <!--<ConstraintSet android:id="@+id/end">-->
+    <!--    <Constraint-->
+    <!--        android:id="@id/background"-->
+    <!--        android:layout_width="0dp"-->
+    <!--        android:layout_height="0dp"-->
+    <!--        android:visibility="invisible"-->
+    <!--        motion:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        motion:layout_constraintEnd_toEndOf="parent"-->
+    <!--        motion:layout_constraintStart_toStartOf="parent"-->
+    <!--        motion:layout_constraintTop_toTopOf="parent" />-->
 
-        <Constraint
-            android:id="@+id/icon"
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:layout_marginEnd="8dp"
-            android:layout_marginBottom="8dp"
-            motion:layout_constraintBottom_toBottomOf="parent"
-            motion:layout_constraintEnd_toEndOf="parent" />
-    </ConstraintSet>
+    <!--    <Constraint-->
+    <!--        android:id="@+id/name"-->
+    <!--        android:layout_width="wrap_content"-->
+    <!--        android:layout_height="20dp"-->
+    <!--        android:layout_marginStart="8dp"-->
+    <!--        android:layout_marginTop="8dp"-->
+    <!--        android:layout_marginEnd="8dp"-->
+    <!--        android:layout_marginBottom="8dp"-->
+    <!--        motion:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        motion:layout_constraintStart_toStartOf="parent" />-->
+
+    <!--    <Constraint-->
+    <!--        android:id="@+id/icon"-->
+    <!--        android:layout_width="24dp"-->
+    <!--        android:layout_height="24dp"-->
+    <!--        android:layout_marginEnd="8dp"-->
+    <!--        android:layout_marginBottom="8dp"-->
+    <!--        motion:layout_constraintBottom_toBottomOf="parent"-->
+    <!--        motion:layout_constraintEnd_toEndOf="parent" />-->
+    <!--</ConstraintSet>-->
 </MotionScene>
