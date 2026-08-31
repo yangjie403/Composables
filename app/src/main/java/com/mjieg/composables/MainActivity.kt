@@ -22,6 +22,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mjieg.composables.components.CompactText
+import com.mjieg.composables.components.CustomBottomNavScreen
+import com.mjieg.composables.components.CustomBottomNavigationBar
 import com.mjieg.composables.components.ScrollFadeEdgesExample
 import com.mjieg.composables.components.parallax.ParallaxView
 import com.mjieg.composables.components.parallax.model.ContainerSettings
@@ -43,18 +45,7 @@ class MainActivity : ComponentActivity() {
                 PreviewLayout {
                     // Text(text = stringResource(R.string.screen_width))
                     // UltimateChartDemo()
-                    ParallaxView(
-                        modifier = Modifier.fillMaxSize(),
-                        backgroundContent = {
-                            Image(
-                                painter = painterResource(R.drawable.wallpaper),
-                                modifier = Modifier.fillMaxSize(),
-                                contentDescription = "",
-                                contentScale = ContentScale.Crop
-                            )
-                        },
-                        backgroundContainerSettings = ContainerSettings(scale = 1.4f)
-                    )
+                    CustomBottomNavScreen { }
                 }
             }
         }

@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
@@ -188,12 +189,6 @@ private fun BottomNavigationItem(
         targetState = selected,
         label = "$title selection",
     )
-    val itemBackground by transition.animateColor(
-        transitionSpec = { spring(stiffness = Spring.StiffnessMedium) },
-        label = "$title background",
-    ) { isSelected ->
-        if (isSelected) SelectedItemColor else Color.Transparent
-    }
     val contentColor by transition.animateColor(
         transitionSpec = { spring(stiffness = Spring.StiffnessMedium) },
         label = "$title content",
@@ -204,7 +199,6 @@ private fun BottomNavigationItem(
     Column(
         modifier = modifier
             .height(NavigationBarHeight)
-            .background(itemBackground)
             .clickable(
                 role = Role.Tab,
                 onClick = onClick,
@@ -231,7 +225,7 @@ private class CenterNotchShape(
     private val notchRadius: Dp,
 ) : Shape {
     override fun createOutline(
-        size: androidx.compose.ui.geometry.Size,
+        size: Size,
         layoutDirection: LayoutDirection,
         density: Density,
     ): Outline {
@@ -247,7 +241,7 @@ private class CenterNotchShape(
             arcTo(
                 rect = Rect(
                     left = centerX - safeRadius,
-                    top = 0f,
+                    top = -safeRadius,
                     right = centerX + safeRadius,
                     bottom = safeRadius,
                 ),

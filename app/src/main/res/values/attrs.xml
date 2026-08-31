@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="NotchedLinearLayout">
+        <!-- 顶边正中间半圆凹槽的半径。 -->
+        <attr name="notchRadius" format="dimension" />
+    </declare-styleable>
+
+</resources>

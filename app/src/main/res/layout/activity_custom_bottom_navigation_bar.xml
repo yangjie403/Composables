@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/white"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/customBottomNavigationTitle"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:text="Speed Test"
+        android:textColor="#0878CE"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/customBottomNavigationEvent"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:gravity="center"
+        android:text="selectedIndex = 0"
+        android:textColor="#707070"
+        android:textSize="14sp" />
+
+    <com.mjieg.composables.views.NotchedLinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:orientation="horizontal"
+        app:notchRadius="40dp">
+
+        <TextView
+            android:id="@+id/tv1"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#FFDADA"
+            android:foreground="?android:attr/selectableItemBackground" />
+
+        <TextView
+            android:id="@+id/tv2"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="#E1F6C4"
+            android:foreground="?android:attr/selectableItemBackground" />
+
+    </com.mjieg.composables.views.NotchedLinearLayout>
+
+    <com.mjieg.composables.views.CustomBottomNavigationBar
+        android:id="@+id/customBottomNavigationBar"
+        android:layout_width="match_parent"
+        android:layout_height="120dp" />
+
+</LinearLayout>
