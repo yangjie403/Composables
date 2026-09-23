@@ -31,4 +31,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Composables"
 include(":app")
- 
+include(":markdown")
